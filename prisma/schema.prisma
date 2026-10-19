@@ -1,0 +1,727 @@
+// ============================================================
+// VI-FLEET
+// Vehicle Intelligence: Fleet Management for Organizations
+//
+// ORM: Prisma
+// Database: PostgreSQL
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DepartmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserRole {
+  SYSTEM_ADMINISTRATOR
+  ORGANIZATION_ADMINISTRATOR
+  VICE_ORGANIZATION_ADMINISTRATOR
+  TRANSPORT_MANAGER
+  VICE_TRANSPORT_MANAGER
+  DEPARTMENT_USER
+  DRIVER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum VehicleAvailability {
+  AVAILABLE
+  ASSIGNED
+  UNAVAILABLE
+}
+
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum TransportationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum TripStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum GPSDeviceStatus {
+  ACTIVE
+  INACTIVE
+  OFFLINE
+}
+
+enum GeofenceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum GeofenceEventType {
+  ENTRY
+  EXIT
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  INSPECTION
+  OTHER
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+// ============================================================
+// ORGANIZATION
+// ============================================================
+
+model Organization {
+  id          String             @id @default(uuid()) @db.Uuid
+  name        String             @db.VarChar(150)
+  description String?
+  status      OrganizationStatus @default(ACTIVE)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  departments            Department[]
+  users                  User[]
+  vehicles               Vehicle[]
+  drivers                Driver[]
+  transportationRequests TransportationRequest[]
+  trips                  Trip[]
+  gpsDevices             GPSDevice[]
+  gpsLocations           GPSLocation[]
+  geofences              Geofence[]
+  geofenceEvents         GeofenceEvent[]
+  maintenanceRecords     MaintenanceRecord[]
+  maintenanceSchedules   MaintenanceSchedule[]
+  fuelRecords            FuelRecord[]
+  alerts                 Alert[]
+
+  @@map("organizations")
+}
+
+// ============================================================
+// DEPARTMENT
+// ============================================================
+
+model Department {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+
+  name        String           @db.VarChar(100)
+  description String?
+  status      DepartmentStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization           Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  users                  User[]
+  transportationRequests TransportationRequest[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId])
+
+  @@map("departments")
+}
+
+// ============================================================
+// USER
+// ============================================================
+
+model User {
+  id                String     @id @default(uuid()) @db.Uuid
+  organizationId    String?    @map("organization_id") @db.Uuid
+  departmentId      String?    @map("department_id") @db.Uuid
+
+  name              String     @db.VarChar(150)
+  email             String     @db.VarChar(255)
+  passwordHash      String?    @map("password_hash")
+  phone             String?    @db.VarChar(30)
+  profilePictureUrl String?    @map("profile_picture_url")
+
+  role   UserRole
+  status UserStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  department Department? @relation(fields: [organizationId, departmentId], references: [organizationId, id], onDelete: Restrict)
+
+  driver Driver?
+
+  submittedRequests TransportationRequest[] @relation("RequestedBy")
+  reviewedRequests  TransportationRequest[] @relation("ReviewedBy")
+
+  createdGeofences Geofence[] @relation("GeofenceCreatedBy")
+
+  @@unique([organizationId, id])
+
+  @@index([organizationId])
+  @@index([organizationId, role])
+  @@index([departmentId])
+
+  @@map("users")
+}
+
+// ============================================================
+// VEHICLE
+// ============================================================
+
+model Vehicle {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+
+  registrationNumber String  @map("registration_number") @db.VarChar(50)
+  vin                String? @db.VarChar(17)
+
+  make        String? @db.VarChar(100)
+  model       String? @db.VarChar(100)
+  year        Int?
+  color       String? @db.VarChar(50)
+  vehicleType String? @map("vehicle_type") @db.VarChar(100)
+
+  status       VehicleStatus       @default(ACTIVE)
+  availability VehicleAvailability @default(AVAILABLE)
+
+  fuelType        String?  @map("fuel_type") @db.VarChar(50)
+  seatingCapacity Int?     @map("seating_capacity")
+  currentOdometer Decimal? @map("current_odometer") @db.Decimal(12, 2)
+
+  notes String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  trips                Trip[]
+  gpsDevices           GPSDevice[]
+  gpsLocations         GPSLocation[]
+  geofenceEvents       GeofenceEvent[]
+  maintenanceRecords   MaintenanceRecord[]
+  maintenanceSchedules MaintenanceSchedule[]
+  fuelRecords          FuelRecord[]
+  alerts               Alert[]
+
+  @@unique([organizationId, id])
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, availability])
+
+  @@map("vehicles")
+}
+
+// ============================================================
+// DRIVER
+// ============================================================
+
+model Driver {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String?      @map("user_id") @db.Uuid
+
+  firstName         String    @map("first_name") @db.VarChar(100)
+  lastName          String    @map("last_name") @db.VarChar(100)
+  phone             String?   @db.VarChar(30)
+  licenseNumber     String    @map("license_number") @db.VarChar(100)
+  licenseExpiryDate DateTime? @map("license_expiry_date") @db.Date
+
+  status DriverStatus @default(ACTIVE)
+
+  notes String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  user User? @relation(fields: [organizationId, userId], references: [organizationId, id], onDelete: Restrict)
+
+  trips  Trip[]
+  alerts Alert[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, userId])
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+
+  @@map("drivers")
+}
+
+// ============================================================
+// TRANSPORTATION REQUEST
+// ============================================================
+
+model TransportationRequest {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  departmentId  String  @map("department_id") @db.Uuid
+  requestedById String  @map("requested_by_id") @db.Uuid
+  reviewedById  String? @map("reviewed_by_id") @db.Uuid
+
+  purpose     String @db.VarChar(200)
+  description String
+
+  origin      String @db.VarChar(255)
+  destination String @db.VarChar(255)
+
+  passengerCount Int @map("passenger_count")
+
+  requestedStart DateTime @map("requested_start") @db.Timestamptz(6)
+  requestedEnd   DateTime @map("requested_end") @db.Timestamptz(6)
+
+  specialRequirements String? @map("special_requirements")
+  notes               String?
+
+  status TransportationRequestStatus @default(PENDING)
+
+  reviewedAt        DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  rejectionReason   String?   @map("rejection_reason")
+  cancellationReason String? @map("cancellation_reason")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  department Department @relation(fields: [organizationId, departmentId], references: [organizationId, id], onDelete: Restrict)
+
+  requestedBy User @relation("RequestedBy", fields: [organizationId, requestedById], references: [organizationId, id], onDelete: Restrict)
+
+  reviewedBy User? @relation("ReviewedBy", fields: [organizationId, reviewedById], references: [organizationId, id], onDelete: Restrict)
+
+  trip Trip?
+
+  @@unique([organizationId, id])
+
+  @@index([organizationId, status])
+  @@index([organizationId, requestedStart])
+  @@index([departmentId])
+  @@index([requestedById])
+
+  @@map("transportation_requests")
+}
+
+// ============================================================
+// TRIP
+// ============================================================
+
+model Trip {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  transportationRequestId String @map("transportation_request_id") @db.Uuid
+
+  vehicleId String @map("vehicle_id") @db.Uuid
+  driverId  String @map("driver_id") @db.Uuid
+
+  scheduledStart DateTime @map("scheduled_start") @db.Timestamptz(6)
+  scheduledEnd   DateTime @map("scheduled_end") @db.Timestamptz(6)
+
+  actualStart DateTime? @map("actual_start") @db.Timestamptz(6)
+  actualEnd   DateTime? @map("actual_end") @db.Timestamptz(6)
+
+  status TripStatus @default(SCHEDULED)
+
+  startOdometer Decimal? @map("start_odometer") @db.Decimal(12, 2)
+  endOdometer   Decimal? @map("end_odometer") @db.Decimal(12, 2)
+
+  distanceKm Decimal? @map("distance_km") @db.Decimal(12, 2)
+
+  notes String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  transportationRequest TransportationRequest @relation(fields: [organizationId, transportationRequestId], references: [organizationId, id], onDelete: Restrict)
+
+  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Restrict)
+
+  driver Driver @relation(fields: [organizationId, driverId], references: [organizationId, id], onDelete: Restrict)
+
+  alerts Alert[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, transportationRequestId])
+
+  @@index([organizationId, vehicleId, scheduledStart])
+  @@index([organizationId, driverId, scheduledStart])
+  @@index([organizationId, status, scheduledStart])
+
+  @@map("trips")
+}
+
+// ============================================================
+// GPS DEVICE
+// ============================================================
+
+model GPSDevice {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+
+  vehicleId String? @map("vehicle_id") @db.Uuid
+
+  deviceIdentifier String          @map("device_identifier") @db.VarChar(150)
+  deviceModel      String?         @map("device_model") @db.VarChar(100)
+  status           GPSDeviceStatus @default(INACTIVE)
+
+  installedAt DateTime? @map("installed_at") @db.Timestamptz(6)
+  lastSeenAt  DateTime? @map("last_seen_at") @db.Timestamptz(6)
+
+  notes String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  vehicle Vehicle? @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Restrict)
+
+  locations GPSLocation[]
+
+  @@unique([organizationId, id])
+
+  @@index([organizationId])
+
+  @@map("gps_devices")
+}
+
+// ============================================================
+// GPS LOCATION
+// ============================================================
+
+model GPSLocation {
+  id BigInt @id @default(autoincrement())
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  vehicleId   String  @map("vehicle_id") @db.Uuid
+  gpsDeviceId String? @map("gps_device_id") @db.Uuid
+
+  latitude  Decimal @db.Decimal(10, 7)
+  longitude Decimal @db.Decimal(10, 7)
+
+  altitude  Decimal? @db.Decimal(10, 2)
+  accuracy  Decimal? @db.Decimal(10, 2)
+  speed     Decimal? @db.Decimal(10, 2)
+  heading   Decimal? @db.Decimal(6, 2)
+  odometer  Decimal? @db.Decimal(12, 2)
+
+  ignitionStatus Boolean? @map("ignition_status")
+
+  recordedAt DateTime @map("recorded_at") @db.Timestamptz(6)
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Restrict)
+
+  gpsDevice GPSDevice? @relation(fields: [organizationId, gpsDeviceId], references: [organizationId, id], onDelete: Restrict)
+
+  geofenceEvents GeofenceEvent[]
+
+  @@index([organizationId, vehicleId, recordedAt(sort: Desc)])
+  @@index([organizationId, gpsDeviceId, recordedAt(sort: Desc)])
+  @@index([organizationId, recordedAt(sort: Desc)])
+
+  @@map("gps_locations")
+}
+
+// ============================================================
+// GEOFENCE
+// ============================================================
+
+model Geofence {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name        String @db.VarChar(150)
+  description String?
+
+  geometry Json
+
+  status GeofenceStatus @default(ACTIVE)
+
+  createdById String? @map("created_by_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  createdBy User? @relation("GeofenceCreatedBy", fields: [organizationId, createdById], references: [organizationId, id], onDelete: Restrict)
+
+  events GeofenceEvent[]
+  alerts Alert[]
+
+  @@unique([organizationId, id])
+
+  @@index([organizationId, status])
+
+  @@map("geofences")
+}
+
+// ============================================================
+// GEOFENCE EVENT
+// ============================================================
+
+model GeofenceEvent {
+  id BigInt @id @default(autoincrement())
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  geofenceId    String  @map("geofence_id") @db.Uuid
+  vehicleId     String  @map("vehicle_id") @db.Uuid
+  gpsLocationId BigInt? @map("gps_location_id")
+
+  eventType GeofenceEventType @map("event_type")
+
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  geofence Geofence @relation(fields: [organizationId, geofenceId], references: [organizationId, id], onDelete: Restrict)
+
+  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Restrict)
+
+  gpsLocation GPSLocation? @relation(fields: [gpsLocationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, vehicleId, occurredAt(sort: Desc)])
+  @@index([organizationId, geofenceId, occurredAt(sort: Desc)])
+  @@index([organizationId, occurredAt(sort: Desc)])
+
+  @@map("geofence_events")
+}
+
+// ============================================================
+// MAINTENANCE RECORD
+// ============================================================
+
+model MaintenanceRecord {
+  id             String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  vehicleId      String @map("vehicle_id") @db.Uuid
+
+  maintenanceType MaintenanceType @map("maintenance_type")
+
+  title       String @db.VarChar(200)
+  description String?
+
+  maintenanceDate DateTime @map("maintenance_date") @db.Date
+
+  odometer Decimal? @db.Decimal(12, 2)
+  cost     Decimal? @db.Decimal(12, 2)
+
+  serviceProvider String? @map("service_provider") @db.VarChar(200)
+
+  status MaintenanceStatus @default(COMPLETED)
+
+  notes String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, vehicleId, maintenanceDate(sort: Desc)])
+  @@index([organizationId, vehicleId])
+
+  @@map("maintenance_records")
+}
+
+// ============================================================
+// MAINTENANCE SCHEDULE
+// ============================================================
+
+model MaintenanceSchedule {
+  id             String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  vehicleId      String @map("vehicle_id") @db.Uuid
+
+  maintenanceType MaintenanceType @map("maintenance_type")
+
+  title       String @db.VarChar(200)
+  description String?
+
+  intervalKm   Decimal? @map("interval_km") @db.Decimal(12, 2)
+  intervalDays Int?     @map("interval_days")
+
+  lastServiceDate     DateTime? @map("last_service_date") @db.Date
+  lastServiceOdometer Decimal?  @map("last_service_odometer") @db.Decimal(12, 2)
+
+  nextServiceDate     DateTime? @map("next_service_date") @db.Date
+  nextServiceOdometer Decimal?  @map("next_service_odometer") @db.Decimal(12, 2)
+
+  status MaintenanceStatus @default(SCHEDULED)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, vehicleId])
+  @@index([organizationId, nextServiceDate])
+  @@index([organizationId, nextServiceOdometer])
+
+  @@map("maintenance_schedules")
+}
+
+// ============================================================
+// FUEL RECORD
+// ============================================================
+
+model FuelRecord {
+  id             String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  vehicleId      String @map("vehicle_id") @db.Uuid
+
+  fuelDate DateTime @map("fuel_date") @db.Timestamptz(6)
+
+  fuelType String? @map("fuel_type") @db.VarChar(50)
+
+  quantityLiters Decimal  @map("quantity_liters") @db.Decimal(12, 3)
+  pricePerLiter  Decimal? @map("price_per_liter") @db.Decimal(12, 3)
+  totalCost      Decimal? @map("total_cost") @db.Decimal(12, 2)
+
+  odometer Decimal? @db.Decimal(12, 2)
+
+  stationName   String? @map("station_name") @db.VarChar(200)
+  receiptNumber String? @map("receipt_number") @db.VarChar(100)
+
+  notes String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, vehicleId, fuelDate(sort: Desc)])
+  @@index([organizationId, vehicleId])
+
+  @@map("fuel_records")
+}
+
+// ============================================================
+// ALERT
+// ============================================================
+
+model Alert {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  vehicleId  String? @map("vehicle_id") @db.Uuid
+  driverId   String? @map("driver_id") @db.Uuid
+  tripId     String? @map("trip_id") @db.Uuid
+  geofenceId String? @map("geofence_id") @db.Uuid
+
+  alertType String        @map("alert_type") @db.VarChar(100)
+  severity  AlertSeverity @default(INFO)
+
+  title   String @db.VarChar(200)
+  message String
+
+  status AlertStatus @default(OPEN)
+
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+
+  acknowledgedAt DateTime? @map("acknowledged_at") @db.Timestamptz(6)
+  resolvedAt     DateTime? @map("resolved_at") @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  vehicle Vehicle? @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Restrict)
+
+  driver Driver? @relation(fields: [organizationId, driverId], references: [organizationId, id], onDelete: Restrict)
+
+  trip Trip? @relation(fields: [organizationId, tripId], references: [organizationId, id], onDelete: Restrict)
+
+  geofence Geofence? @relation(fields: [organizationId, geofenceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, status])
+  @@index([organizationId, severity])
+  @@index([organizationId, occurredAt(sort: Desc)])
+  @@index([organizationId, vehicleId, occurredAt(sort: Desc)])
+
+  @@map("alerts")
+}
