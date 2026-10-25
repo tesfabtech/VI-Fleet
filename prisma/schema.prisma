@@ -117,6 +117,29 @@ enum AlertStatus {
   RESOLVED
 }
 
+
+enum OrganizationApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum OrganizationPaymentStatus {
+  NOT_REQUIRED
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum DepartmentUserApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
 // ============================================================
 // ORGANIZATION
 // ============================================================
@@ -130,6 +153,10 @@ model Organization {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  code         String? @unique @db.VarChar(20)
+  contactEmail String? @map("contact_email") @db.VarChar(255)
+  phone        String? @db.VarChar(30)
 
   departments            Department[]
   users                  User[]
@@ -145,9 +172,147 @@ model Organization {
   maintenanceSchedules   MaintenanceSchedule[]
   fuelRecords            FuelRecord[]
   alerts                 Alert[]
+  departmentRegistrationLinks DepartmentRegistrationLink[]
+  departmentUserApplications DepartmentUserApplication[]
+  
+  application OrganizationApplication?
 
   @@map("organizations")
 }
+
+
+// ============================================================
+// ORGANIZATION_APPLICATION
+// ============================================================
+
+model OrganizationApplication {
+  id               String @id @default(uuid()) @db.Uuid
+  organizationName String @map("organization_name") @db.VarChar(150)
+  contactEmail     String @map("contact_email") @db.VarChar(255)
+  phone            String? @db.VarChar(30)
+  description      String?
+
+  status        OrganizationApplicationStatus @default(PENDING)
+  paymentStatus OrganizationPaymentStatus @default(NOT_REQUIRED) @map("payment_status")
+
+  reviewNotes String? @map("review_notes")
+
+  reviewedById String? @map("reviewed_by_id") @db.Uuid
+  reviewedAt   DateTime? @map("reviewed_at") @db.Timestamptz(6)
+
+  organizationId String? @unique @map("organization_id") @db.Uuid
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  reviewedBy   User?         @relation("ApplicationReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  submittedAt DateTime @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, submittedAt])
+  @@index([contactEmail])
+  @@index([reviewedById])
+
+  @@map("organization_applications")
+}
+
+
+// ============================================================
+// ORGANIZATION_iNVITATION
+// ============================================================
+
+model OrganizationInvitation {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  createdById String   @map("created_by_id") @db.Uuid
+
+  tokenHash String @unique @map("token_hash") @db.VarChar(255)
+
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User @relation("InvitationRecipient", fields: [userId], references: [id], onDelete: Restrict)
+  createdBy User @relation("InvitationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([createdById])
+
+  @@map("organization_invitations")
+}
+
+
+
+// ============================================================
+// DEPARTMENT USER REGISTRATION LINK
+// ============================================================
+
+model DepartmentRegistrationLink {
+  id          String   @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  createdById String   @map("created_by_id") @db.Uuid
+
+  tokenHash      String  @unique @map("token_hash") @db.VarChar(255)
+  tokenEncrypted String? @map("token_encrypted") @db.Text
+
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy    User         @relation("DepartmentRegistrationLinkCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([createdById])
+
+  @@map("department_registration_links")
+}
+
+
+// ============================================================
+// DEPARTMENT USER APPLICATION
+// ============================================================
+
+model DepartmentUserApplication {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  departmentId   String @map("department_id") @db.Uuid
+
+  firstName  String @map("first_name") @db.VarChar(150)
+  middleName String @map("middle_name") @db.VarChar(150)
+  lastName   String @map("last_name") @db.VarChar(150)
+  email      String @db.VarChar(255)
+  phone      String? @db.VarChar(30)
+
+  status DepartmentUserApplicationStatus @default(PENDING)
+
+  reviewNotes  String?   @map("review_notes")
+  reviewedById String?   @map("reviewed_by_id") @db.Uuid
+  reviewedAt   DateTime? @map("reviewed_at") @db.Timestamptz(6)
+
+  createdUserId String? @map("created_user_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department   Department   @relation(fields: [organizationId, departmentId], references: [organizationId, id], onDelete: Restrict)
+  reviewedBy   User?        @relation("DepartmentUserApplicationReviewedBy", fields: [organizationId, reviewedById], references: [organizationId, id], onDelete: Restrict)
+  createdUser  User?        @relation("DepartmentUserApplicationCreatedUser", fields: [organizationId, createdUserId], references: [organizationId, id], onDelete: Restrict)
+
+  submittedAt DateTime @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organizationId, createdUserId])
+  @@index([organizationId, status, submittedAt])
+  @@index([organizationId, departmentId])
+  @@index([organizationId, email])
+  @@index([reviewedById])
+
+  @@map("department_user_applications")
+}
+
 
 // ============================================================
 // DEPARTMENT
@@ -168,6 +333,7 @@ model Department {
   organization           Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   users                  User[]
   transportationRequests TransportationRequest[]
+  departmentUserApplications DepartmentUserApplication[]
 
   @@unique([organizationId, id])
   @@index([organizationId])
@@ -184,8 +350,12 @@ model User {
   organizationId    String?    @map("organization_id") @db.Uuid
   departmentId      String?    @map("department_id") @db.Uuid
 
-  name              String     @db.VarChar(150)
-  email             String     @db.VarChar(255)
+  firstName  String? @map("first_name") @db.VarChar(150)
+  middleName String? @map("middle_name") @db.VarChar(150)
+  lastName   String? @map("last_name") @db.VarChar(150)
+  email      String? @db.VarChar(255)
+  
+  pendingEmail String? @map("pending_email") @db.VarChar(255)
   passwordHash      String?    @map("password_hash")
   phone             String?    @db.VarChar(30)
   profilePictureUrl String?    @map("profile_picture_url")
@@ -203,11 +373,22 @@ model User {
 
   driver Driver?
 
+  emailVerificationTokens EmailVerificationToken[]
   submittedRequests TransportationRequest[] @relation("RequestedBy")
   reviewedRequests  TransportationRequest[] @relation("ReviewedBy")
 
   createdGeofences Geofence[] @relation("GeofenceCreatedBy")
 
+  reviewedApplications OrganizationApplication[] @relation("ApplicationReviewedBy")
+  receivedInvitations   OrganizationInvitation[]  @relation("InvitationRecipient")
+  createdInvitations    OrganizationInvitation[]  @relation("InvitationCreatedBy")
+
+  createdDepartmentRegistrationLinks DepartmentRegistrationLink[] @relation("DepartmentRegistrationLinkCreatedBy")
+  reviewedDepartmentUserApplications DepartmentUserApplication[] @relation("DepartmentUserApplicationReviewedBy")
+  createdDepartmentUserApplication DepartmentUserApplication? @relation("DepartmentUserApplicationCreatedUser")
+
+  passwordResetTokens PasswordResetToken[]
+  
   @@unique([organizationId, id])
 
   @@index([organizationId])
@@ -724,4 +905,37 @@ model Alert {
   @@index([organizationId, vehicleId, occurredAt(sort: Desc)])
 
   @@map("alerts")
+}
+
+// ============================================================
+// EMAIL_VERIFICATION_TOKEN
+// ============================================================
+
+model EmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@map("email_verification_tokens")
+}
+
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("password_reset_tokens")
 }
