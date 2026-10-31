@@ -1,4 +1,5 @@
-
+// app/organization/department-users/registration-links/page.tsx
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -29,20 +30,30 @@ export default async function RegistrationLinksPage({
   const organizationId = session.user.organizationId;
   if (!organizationId) notFound();
 
-  const params = await searchParams;
+  const [params, organization, links] = await Promise.all([
+    searchParams,
+    prisma.organization.findFirst({
+      where: {
+        id: organizationId,
+        deletedAt: null,
+      },
+      select: {
+        name: true,
+      },
+    }),
+    prisma.departmentRegistrationLink.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
-  const links = await prisma.departmentRegistrationLink.findMany({
-    where: { organizationId },
-    orderBy: { createdAt: "desc" },
-  });
+  if (!organization) notFound();
 
   const now = new Date();
 
   // Any unrevoked record blocks creation until it is revoked,
   // including an expired link.
-  const hasUnrevokedLink = links.some(
-    (link) => link.revokedAt === null,
-  );
+  const hasUnrevokedLink = links.some((link) => link.revokedAt === null);
 
   const activeLink = links.find(
     (link) =>
@@ -54,9 +65,7 @@ export default async function RegistrationLinksPage({
 
   if (activeLink?.tokenEncrypted) {
     try {
-      const rawToken = decryptRegistrationToken(
-        activeLink.tokenEncrypted,
-      );
+      const rawToken = decryptRegistrationToken(activeLink.tokenEncrypted);
 
       activeRegistrationUrl = getAppUrl(
         `/department-apply?token=${encodeURIComponent(rawToken)}`,
@@ -72,13 +81,20 @@ export default async function RegistrationLinksPage({
   return (
     <main className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <Link
+          href="/organization/department-users"
+          className="text-sm font-medium text-blue-600 hover:underline"
+        >
+          ← Back to Department Users
+        </Link>
+
+        <h1 className="mt-2 text-2xl font-bold text-gray-900">
           Department User Registration Links
         </h1>
 
         <p className="mt-2 text-sm text-gray-600">
-          Create, copy, share, and revoke links applicants use
-          to apply for Department User accounts.
+          Create, copy, share, and revoke links applicants use to apply for
+          Department User accounts.
         </p>
       </div>
 
@@ -87,14 +103,15 @@ export default async function RegistrationLinksPage({
           role="status"
           className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800"
         >
-          Registration link revoked successfully. You can now
-          generate a new link.
+          Registration link revoked successfully. You can now generate a new
+          link.
         </p>
       )}
 
       <RegistrationLinkManager
         activeRegistrationUrl={activeRegistrationUrl}
         hasUnrevokedLink={hasUnrevokedLink}
+        organizationName={organization.name}
       />
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -110,8 +127,7 @@ export default async function RegistrationLinksPage({
           <div className="mt-4 space-y-4">
             {links.map((link) => {
               const expired =
-                link.expiresAt !== null &&
-                link.expiresAt <= now;
+                link.expiresAt !== null && link.expiresAt <= now;
 
               const status = link.revokedAt
                 ? "Revoked"
@@ -148,11 +164,7 @@ export default async function RegistrationLinksPage({
 
                   {!link.revokedAt && (
                     <form action={revokeRegistrationLink}>
-                      <input
-                        type="hidden"
-                        name="linkId"
-                        value={link.id}
-                      />
+                      <input type="hidden" name="linkId" value={link.id} />
 
                       <button
                         type="submit"
