@@ -3,20 +3,132 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --vi-accent-50: #eff6ff;
+  --vi-accent-100: #dbeafe;
+  --vi-accent-600: #2563eb;
+  --vi-accent-700: #1d4ed8;
+  --vi-accent-800: #1e40af;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Accent Color Palettes */
+html[data-vi-accent="blue"] {
+  --vi-accent-50: #eff6ff;
+  --vi-accent-100: #dbeafe;
+  --vi-accent-600: #2563eb;
+  --vi-accent-700: #1d4ed8;
+  --vi-accent-800: #1e40af;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html[data-vi-accent="emerald"] {
+  --vi-accent-50: #ecfdf5;
+  --vi-accent-100: #d1fae5;
+  --vi-accent-600: #059669;
+  --vi-accent-700: #047857;
+  --vi-accent-800: #065f46;
+}
+
+html[data-vi-accent="indigo"] {
+  --vi-accent-50: #eef2ff;
+  --vi-accent-100: #e0e7ff;
+  --vi-accent-600: #4f46e5;
+  --vi-accent-700: #4338ca;
+  --vi-accent-800: #3730a3;
+}
+
+html[data-vi-accent="slate"] {
+  --vi-accent-50: #f1f5f9;
+  --vi-accent-100: #e2e8f0;
+  --vi-accent-600: #334155;
+  --vi-accent-700: #0f172a;
+  --vi-accent-800: #020617;
+}
+
+/* Apply chosen accent color across workspace primary buttons, links, and active nav items */
+.vi-workspace .bg-blue-600,
+.vi-workspace .bg-blue-700 {
+  background-color: var(--vi-accent-600) !important;
+}
+
+.vi-workspace .hover\:bg-blue-700:hover,
+.vi-workspace .hover\:bg-blue-800:hover {
+  background-color: var(--vi-accent-700) !important;
+}
+
+.vi-workspace .text-blue-600,
+.vi-workspace .text-blue-700 {
+  color: var(--vi-accent-600) !important;
+}
+
+.vi-workspace .bg-blue-50 {
+  background-color: var(--vi-accent-50) !important;
+}
+
+.vi-workspace .bg-blue-100 {
+  background-color: var(--vi-accent-100) !important;
+}
+
+/* Dark Theme Overrides for Workspace Pages */
+html[data-vi-theme="dark"] .vi-workspace {
+  background-color: #0b1120 !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-vi-theme="dark"] .vi-workspace .bg-white {
+  background-color: #111827 !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-vi-theme="dark"] .vi-workspace .bg-slate-50,
+html[data-vi-theme="dark"] .vi-workspace .bg-gray-50,
+html[data-vi-theme="dark"] .vi-workspace .bg-slate-100,
+html[data-vi-theme="dark"] .vi-workspace .bg-gray-100 {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+html[data-vi-theme="dark"] .vi-workspace .border-slate-200,
+html[data-vi-theme="dark"] .vi-workspace .border-gray-200,
+html[data-vi-theme="dark"] .vi-workspace .border-slate-100,
+html[data-vi-theme="dark"] .vi-workspace .border-gray-100 {
+  border-color: #1f2937 !important;
+}
+
+html[data-vi-theme="dark"] .vi-workspace .divide-slate-200 > :not(:last-child),
+html[data-vi-theme="dark"] .vi-workspace .divide-gray-200 > :not(:last-child),
+html[data-vi-theme="dark"] .vi-workspace .divide-slate-100 > :not(:last-child) {
+  border-color: #1f2937 !important;
+}
+
+html[data-vi-theme="dark"] .vi-workspace .text-slate-900,
+html[data-vi-theme="dark"] .vi-workspace .text-gray-900,
+html[data-vi-theme="dark"] .vi-workspace .text-slate-800,
+html[data-vi-theme="dark"] .vi-workspace .text-gray-800 {
+  color: #f8fafc !important;
+}
+
+html[data-vi-theme="dark"] .vi-workspace .text-slate-700,
+html[data-vi-theme="dark"] .vi-workspace .text-gray-700,
+html[data-vi-theme="dark"] .vi-workspace .text-slate-600,
+html[data-vi-theme="dark"] .vi-workspace .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+html[data-vi-theme="dark"] .vi-workspace .text-slate-500,
+html[data-vi-theme="dark"] .vi-workspace .text-gray-500,
+html[data-vi-theme="dark"] .vi-workspace .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+html[data-vi-theme="dark"] .vi-workspace input:not([type="hidden"]),
+html[data-vi-theme="dark"] .vi-workspace textarea,
+html[data-vi-theme="dark"] .vi-workspace select {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html[data-vi-theme="dark"] .vi-workspace .bg-blue-50 {
+  background-color: rgba(37, 99, 235, 0.18) !important;
 }
 
 body {
