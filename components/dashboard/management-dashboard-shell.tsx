@@ -50,7 +50,9 @@ export default function ManagementDashboardShell({
   useEffect(() => {
     const saved = localStorage.getItem("vi-fleet-theme") as ThemeMode | null;
     if (saved === "light" || saved === "dark" || saved === "system") {
-      setTheme(saved);
+      queueMicrotask(() => {
+        setTheme(saved);
+      });
     }
     syncThemeOnDocument();
 
@@ -92,7 +94,7 @@ export default function ManagementDashboardShell({
   }
 
   return (
-    <div className="vi-workspace min-h-screen bg-slate-50 text-slate-900 transition-colors duration-200 md:flex">
+    <div className="vi-workspace min-h-screen md:h-screen md:h-[100dvh] md:overflow-hidden bg-slate-50 text-slate-900 transition-colors duration-200 md:flex">
       <DashboardSidebar
         brand={brand}
         userName={userName}
@@ -100,8 +102,8 @@ export default function ManagementDashboardShell({
         navigation={navigation}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+      <div className="flex min-w-0 flex-1 flex-col md:h-full md:overflow-hidden">
+        <header className="sticky top-0 z-30 shrink-0 border-b border-slate-200 bg-white">
           <div className="flex min-h-20 items-center justify-between gap-4 px-5 py-3 sm:px-8">
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
@@ -236,7 +238,7 @@ export default function ManagementDashboardShell({
           </div>
         </header>
 
-        <main className="flex-1 p-5 sm:p-8">
+        <main className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-8">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
