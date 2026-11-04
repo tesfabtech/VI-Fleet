@@ -7,10 +7,6 @@ const navigation = [
   { label: "Overview", href: "/organization" },
   { label: "Departments", href: "/organization/departments" },
   { label: "Department Users", href: "/organization/department-users" },
-  {
-    label: "Registration Links",
-    href: "/organization/department-users/registration-links",
-  },
   { label: "Transport Managers", href: "/organization/transport-managers" },
   { label: "Settings", href: "/organization/settings" },
   { label: "Fleet" },
