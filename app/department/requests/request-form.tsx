@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import {
   cancelTransportationRequest,
   createTransportationRequest,
+  emptyDepartmentRecycleBin,
+  permanentlyDeleteTransportationRequest,
+  restoreTransportationRequest,
+  softDeleteTransportationRequest,
   updateTransportationRequest,
   type RequestActionState,
 } from "./actions";
@@ -60,10 +64,14 @@ export default function RequestForm({
   const [priority, setPriority] = useState<PriorityOption>(init.priority || "STANDARD");
 
   useEffect(() => {
-    if (state.ok && mode === "create" && state.requestId) {
+    if (!state.ok) return;
+    if (mode === "create" && state.requestId) {
       router.push(`/department/requests/${state.requestId}?submitted=1`);
+    } else if (mode === "edit" && init.requestId) {
+      router.replace(`/department/requests/${init.requestId}?updated=1`);
+      router.refresh();
     }
-  }, [state.ok, state.requestId, mode, router]);
+  }, [state.ok, state.requestId, mode, init.requestId, router]);
 
   const err = (field: string) =>
     state.fieldErrors?.[field] ? (
@@ -261,10 +269,15 @@ export function CancelRequestCard({
   currentStatus: "PENDING" | "APPROVED";
   hasScheduledTrip: boolean;
 }) {
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState<RequestActionState, FormData>(
     cancelTransportationRequest,
     {},
   );
+
+  useEffect(() => {
+    if (state.ok) router.refresh();
+  }, [state.ok, router]);
 
   return (
     <section className="rounded-2xl border border-rose-200 bg-rose-50/40 p-6">
@@ -301,5 +314,201 @@ export function CancelRequestCard({
         </button>
       </form>
     </section>
+  );
+}
+
+export function SoftDeleteButton({
+  requestId,
+  redirectAfter = false,
+  compact = false,
+}: {
+  requestId: string;
+  redirectAfter?: boolean;
+  compact?: boolean;
+}) {
+  const router = useRouter();
+  const [state, formAction, isPending] = useActionState<RequestActionState, FormData>(
+    softDeleteTransportationRequest,
+    {},
+  );
+
+  useEffect(() => {
+    if (!state.ok) return;
+    if (redirectAfter) {
+      router.push("/department/requests/recycle-bin?trashed=1");
+    } else {
+      router.refresh();
+    }
+  }, [state.ok, redirectAfter, router]);
+
+  return (
+    <form action={formAction} className="inline-flex flex-col items-end">
+      <input type="hidden" name="requestId" value={requestId} />
+      <button
+        type="submit"
+        disabled={isPending}
+        title="Move request to Recycle Bin"
+        className={
+          compact
+            ? "text-xs font-semibold text-rose-600 hover:underline disabled:opacity-50"
+            : "rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+        }
+      >
+        {isPending ? "Moving..." : compact ? "Delete" : "Move to Recycle Bin"}
+      </button>
+      {state.error && (
+        <span className="mt-1 text-[11px] font-medium text-rose-600">{state.error}</span>
+      )}
+    </form>
+  );
+}
+
+export function RestoreRequestButton({
+  requestId,
+  compact = false,
+}: {
+  requestId: string;
+  compact?: boolean;
+}) {
+  const router = useRouter();
+  const [state, formAction, isPending] = useActionState<RequestActionState, FormData>(
+    restoreTransportationRequest,
+    {},
+  );
+
+  useEffect(() => {
+    if (state.ok) router.refresh();
+  }, [state.ok, router]);
+
+  return (
+    <form action={formAction} className="inline-flex flex-col items-end">
+      <input type="hidden" name="requestId" value={requestId} />
+      <button
+        type="submit"
+        disabled={isPending}
+        className={
+          compact
+            ? "rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+            : "rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+        }
+      >
+        {isPending ? "Restoring..." : "Restore Request"}
+      </button>
+      {state.error && (
+        <span className="mt-1 text-[11px] font-medium text-rose-600">{state.error}</span>
+      )}
+    </form>
+  );
+}
+
+export function PermanentDeleteButton({
+  requestId,
+  redirectAfter = false,
+}: {
+  requestId: string;
+  redirectAfter?: boolean;
+}) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [state, formAction, isPending] = useActionState<RequestActionState, FormData>(
+    permanentlyDeleteTransportationRequest,
+    {},
+  );
+
+  useEffect(() => {
+    if (!state.ok) return;
+    if (redirectAfter) {
+      router.push("/department/requests/recycle-bin?deleted=1");
+    } else {
+      router.refresh();
+    }
+  }, [state.ok, redirectAfter, router]);
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="rounded-lg border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+      >
+        Delete Forever
+      </button>
+    );
+  }
+
+  return (
+    <form action={formAction} className="inline-flex items-center gap-1.5">
+      <input type="hidden" name="requestId" value={requestId} />
+      <button
+        type="submit"
+        disabled={isPending}
+        className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50"
+      >
+        {isPending ? "Deleting..." : "Confirm Permanent Delete"}
+      </button>
+      <button
+        type="button"
+        onClick={() => setConfirming(false)}
+        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+      >
+        Cancel
+      </button>
+      {state.error && (
+        <span className="text-[11px] font-medium text-rose-600">{state.error}</span>
+      )}
+    </form>
+  );
+}
+
+export function EmptyRecycleBinButton({ count }: { count: number }) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [state, formAction, isPending] = useActionState<RequestActionState, FormData>(
+    emptyDepartmentRecycleBin,
+    {},
+  );
+
+  useEffect(() => {
+    if (state.ok) {
+      setConfirming(false);
+      router.refresh();
+    }
+  }, [state.ok, router]);
+
+  if (count === 0) return null;
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-800 hover:bg-rose-100"
+        >
+          Empty Recycle Bin ({count})
+        </button>
+      ) : (
+        <form action={formAction} className="flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={isPending}
+            className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50"
+          >
+            {isPending ? "Emptying..." : `Confirm Delete All (${count})`}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+          >
+            Cancel
+          </button>
+        </form>
+      )}
+      {state.error && <p className="text-xs font-medium text-rose-600">{state.error}</p>}
+      {state.ok && state.message && (
+        <p className="text-xs font-medium text-emerald-700">{state.message}</p>
+      )}
+    </div>
   );
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import {
   decodeSpecialRequirements,
+  isUuid,
   requireDepartmentUserContext,
   toAddisDateTimeLocalValue,
 } from "@/lib/department-auth";
@@ -42,14 +43,13 @@ export default async function NewDepartmentRequestPage({
 
   let clonedTitle: string | null = null;
 
-  if (params.cloneFrom) {
+  if (params.cloneFrom && isUuid(params.cloneFrom)) {
     const source = await prisma.transportationRequest.findFirst({
       where: {
         id: params.cloneFrom,
         organizationId: ctx.organizationId,
         departmentId: ctx.departmentId,
         requestedById: ctx.userId,
-        deletedAt: null,
       },
     });
 
@@ -89,28 +89,25 @@ export default async function NewDepartmentRequestPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <Link
-            href="/department/requests"
-            className="text-xs font-semibold text-blue-600 hover:underline"
-          >
-            ← Back to Transportation Requests
-          </Link>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-            Submit Transportation Request
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Complete the electronic request form below. New requests are created in{" "}
-            <span className="font-semibold text-amber-700">PENDING</span> status and routed to your organization's Transport Manager.
-          </p>
-        </div>
+      <div>
+        <Link
+          href="/department/requests"
+          className="text-xs font-semibold text-blue-600 hover:underline"
+        >
+          ← Back to Transportation Requests
+        </Link>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+          Submit Transportation Request
+        </h1>
+        <p className="mt-1 text-sm text-slate-600">
+          Complete the electronic request form below. New requests start as{" "}
+          <span className="font-semibold text-amber-700">PENDING</span>.
+        </p>
       </div>
 
       {clonedTitle && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-medium text-blue-800">
-          Pre-filled from previous request:{" "}
-          <span className="font-bold">{clonedTitle}</span>. Please review and adjust your departure and return times before submitting.
+          Pre-filled from previous request: <strong>{clonedTitle}</strong>. Review and update your schedule before submitting.
         </div>
       )}
 

@@ -14,6 +14,11 @@ export type DepartmentUserContext = {
   departmentName: string;
 };
 
+export const isUuid = (value: string): boolean =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value.trim(),
+  );
+
 const getCachedDepartmentAuth = cache(async () => {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, reason: "UNAUTH" as const };
@@ -86,15 +91,39 @@ export async function requireDepartmentActionContext() {
   return { ok: true as const, ctx: res.ctx };
 }
 
-export const canEditTransportationRequest = (status: TransportationRequestStatus) =>
-  status === "PENDING";
+export const canEditTransportationRequest = (
+  status: TransportationRequestStatus,
+  deletedAt?: Date | null,
+) => !deletedAt && status === "PENDING";
 
 export const canCancelTransportationRequest = (
   status: TransportationRequestStatus,
   tripStatus?: TripStatus | null,
+  deletedAt?: Date | null,
 ) =>
-  status === "PENDING" ||
-  (status === "APPROVED" && (!tripStatus || tripStatus === "SCHEDULED"));
+  !deletedAt &&
+  (status === "PENDING" ||
+    (status === "APPROVED" && (!tripStatus || tripStatus === "SCHEDULED")));
+
+export const canSoftDeleteTransportationRequest = (
+  status: TransportationRequestStatus,
+  tripStatus?: TripStatus | null,
+  deletedAt?: Date | null,
+) => {
+  if (deletedAt) return false;
+  if (status === "PENDING" || status === "REJECTED" || status === "CANCELLED") {
+    return !tripStatus || tripStatus === "CANCELLED" || tripStatus === "COMPLETED";
+  }
+  if (status === "APPROVED") {
+    return tripStatus === "CANCELLED" || tripStatus === "COMPLETED";
+  }
+  return false;
+};
+
+export const canHardDeleteTransportationRequest = (
+  tripStatus?: TripStatus | null,
+  deletedAt?: Date | null,
+) => Boolean(deletedAt) && (!tripStatus || tripStatus === "CANCELLED");
 
 export type TripTypeOption = "ROUND_TRIP" | "ONE_WAY";
 export type PriorityOption = "STANDARD" | "URGENT";

@@ -6,6 +6,7 @@ const navigation = [
   { label: "Overview", href: "/department" },
   { label: "Transport Requests", href: "/department/requests" },
   { label: "New Request", href: "/department/requests/new" },
+  { label: "Recycle Bin", href: "/department/requests/recycle-bin" },
 ];
 
 export default async function DepartmentLayout({
@@ -26,4 +27,3 @@ export default async function DepartmentLayout({
     </ManagementDashboardShell>
   );
 }
-

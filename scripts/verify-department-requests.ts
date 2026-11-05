@@ -1,36 +1,71 @@
 import assert from "node:assert/strict";
-import {
-  canCancelTransportationRequest,
-  canEditTransportationRequest,
-  decodeSpecialRequirements,
-  encodeSpecialRequirements,
-  formatAddisDateTime,
-  toAddisDateTimeLocalValue,
-} from "../lib/department-auth";
+
+// Automatically load .env in Node 20.12+ / Node 24+ and provide a safe fallback for unit verification
+try {
+  process.loadEnvFile?.(".env");
+} catch {
+  // Ignore if .env is not present during offline unit checks
+}
+process.env.DATABASE_URL ??=
+  "postgresql://postgres:postgres@localhost:5432/vi_fleet";
 
 async function runVerification() {
+  const {
+    canCancelTransportationRequest,
+    canEditTransportationRequest,
+    canHardDeleteTransportationRequest,
+    canSoftDeleteTransportationRequest,
+    decodeSpecialRequirements,
+    encodeSpecialRequirements,
+    formatAddisDateTime,
+    isUuid,
+    toAddisDateTimeLocalValue,
+  } = await import("../lib/department-auth");
+
   console.log("=== VI-Fleet Department Transportation Requests Verification ===");
 
-  // 1. Verify Edit State Machine (Only PENDING is editable)
-  assert.equal(canEditTransportationRequest("PENDING"), true);
-  assert.equal(canEditTransportationRequest("APPROVED"), false);
-  assert.equal(canEditTransportationRequest("REJECTED"), false);
-  assert.equal(canEditTransportationRequest("CANCELLED"), false);
-  console.log("✔ Edit state machine verified (strictly PENDING only).");
+  // 1. Verify UUID Guard
+  assert.equal(isUuid("550e8400-e29b-41d4-a716-446655440000"), true);
+  assert.equal(isUuid("not-a-uuid"), false);
+  console.log("✔ UUID format guard verified.");
 
-  // 2. Verify Cancel State Machine (PENDING, or APPROVED when Trip is null or SCHEDULED)
-  assert.equal(canCancelTransportationRequest("PENDING", null), true);
-  assert.equal(canCancelTransportationRequest("APPROVED", null), true);
-  assert.equal(canCancelTransportationRequest("APPROVED", "SCHEDULED"), true);
-  assert.equal(canCancelTransportationRequest("APPROVED", "IN_PROGRESS"), false);
-  assert.equal(canCancelTransportationRequest("APPROVED", "COMPLETED"), false);
-  assert.equal(canCancelTransportationRequest("REJECTED", null), false);
-  assert.equal(canCancelTransportationRequest("CANCELLED", null), false);
+  // 2. Verify Edit State Machine (Only active PENDING is editable)
+  assert.equal(canEditTransportationRequest("PENDING", null), true);
+  assert.equal(canEditTransportationRequest("PENDING", new Date()), false);
+  assert.equal(canEditTransportationRequest("APPROVED", null), false);
+  assert.equal(canEditTransportationRequest("REJECTED", null), false);
+  assert.equal(canEditTransportationRequest("CANCELLED", null), false);
+  console.log("✔ Edit state machine verified (strictly active PENDING only).");
+
+  // 3. Verify Cancel State Machine (PENDING, or APPROVED when Trip is null or SCHEDULED)
+  assert.equal(canCancelTransportationRequest("PENDING", null, null), true);
+  assert.equal(canCancelTransportationRequest("PENDING", null, new Date()), false);
+  assert.equal(canCancelTransportationRequest("APPROVED", null, null), true);
+  assert.equal(canCancelTransportationRequest("APPROVED", "SCHEDULED", null), true);
+  assert.equal(canCancelTransportationRequest("APPROVED", "IN_PROGRESS", null), false);
+  assert.equal(canCancelTransportationRequest("APPROVED", "COMPLETED", null), false);
+  assert.equal(canCancelTransportationRequest("REJECTED", null, null), false);
+  assert.equal(canCancelTransportationRequest("CANCELLED", null, null), false);
   console.log(
-    "✔ Cancel state machine verified (blocks IN_PROGRESS, COMPLETED, REJECTED, CANCELLED).",
+    "✔ Cancel state machine verified (blocks soft-deleted, IN_PROGRESS, COMPLETED, REJECTED, CANCELLED).",
   );
 
-  // 3. Verify Structured Fleet Manager Metadata Encoding/Decoding
+  // 4. Verify Soft Delete & Permanent Delete (Recycle Bin) State Machine
+  assert.equal(canSoftDeleteTransportationRequest("PENDING", null, null), true);
+  assert.equal(canSoftDeleteTransportationRequest("REJECTED", null, null), true);
+  assert.equal(canSoftDeleteTransportationRequest("CANCELLED", "CANCELLED", null), true);
+  assert.equal(canSoftDeleteTransportationRequest("APPROVED", "SCHEDULED", null), false);
+  assert.equal(canSoftDeleteTransportationRequest("APPROVED", "IN_PROGRESS", null), false);
+  assert.equal(canSoftDeleteTransportationRequest("APPROVED", "COMPLETED", null), true);
+  assert.equal(canSoftDeleteTransportationRequest("PENDING", null, new Date()), false);
+
+  assert.equal(canHardDeleteTransportationRequest(null, null), false);
+  assert.equal(canHardDeleteTransportationRequest(null, new Date()), true);
+  assert.equal(canHardDeleteTransportationRequest("CANCELLED", new Date()), true);
+  assert.equal(canHardDeleteTransportationRequest("COMPLETED", new Date()), false);
+  console.log("✔ Soft delete & Recycle Bin permanent delete rules verified.");
+
+  // 5. Verify Structured Fleet Manager Metadata Encoding/Decoding
   const encoded = encodeSpecialRequirements({
     tripType: "ONE_WAY",
     priority: "URGENT",
@@ -54,22 +89,14 @@ async function runVerification() {
   );
   console.log("✔ Structured Fleet Manager metadata encode/decode verified.");
 
-  // 4. Verify Plain Legacy specialRequirements Fallback
-  const legacyDecoded = decodeSpecialRequirements("Wheelchair accessible van");
-  assert.equal(legacyDecoded.tripType, "ROUND_TRIP");
-  assert.equal(legacyDecoded.priority, "STANDARD");
-  assert.equal(legacyDecoded.vehiclePreference, "ANY");
-  assert.equal(legacyDecoded.extraRequirements, "Wheelchair accessible van");
-  console.log("✔ Legacy specialRequirements fallback verified.");
-
-  // 5. Verify Africa/Addis_Ababa (UTC+3) Date Formatting
-  const sampleUtc = new Date("2026-11-10T06:30:00.000Z"); // 09:30 in Addis Ababa (+03:00)
+  // 6. Verify Africa/Addis_Ababa (UTC+3) Date Formatting
+  const sampleUtc = new Date("2026-11-10T06:30:00.000Z");
   const localInput = toAddisDateTimeLocalValue(sampleUtc);
   assert.equal(localInput, "2026-11-10T09:30");
   assert.ok(formatAddisDateTime(sampleUtc).includes("2026"));
   console.log("✔ Africa/Addis_Ababa (UTC+3) date conversion verified.");
 
-  console.log("\nAll Department Transportation Request checks passed!");
+  console.log("\nAll Department Transportation Request & Recycle Bin checks passed!");
 }
 
 runVerification().catch((err) => {

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import {
+  canSoftDeleteTransportationRequest,
   decodeSpecialRequirements,
   formatAddisDateTime,
   requireDepartmentUserContext,
 } from "@/lib/department-auth";
+import { SoftDeleteButton } from "./requests/request-form";
 
 const badge: Record<string, string> = {
   PENDING: "bg-amber-50 text-amber-800 border-amber-200",
@@ -25,7 +27,7 @@ export default async function DepartmentDashboardPage() {
     myPending,
     myApproved,
     deptTotal,
-    completedTrips,
+    recycleBinCount,
     recentRequests,
     upcomingApproved,
     maxVeh,
@@ -37,18 +39,19 @@ export default async function DepartmentDashboardPage() {
       where: { ...baseWhere, requestedById: ctx.userId, status: "APPROVED" },
     }),
     prisma.transportationRequest.count({ where: baseWhere }),
-    prisma.trip.count({
+    prisma.transportationRequest.count({
       where: {
         organizationId: ctx.organizationId,
-        status: "COMPLETED",
-        deletedAt: null,
-        transportationRequest: { departmentId: ctx.departmentId, requestedById: ctx.userId },
+        departmentId: ctx.departmentId,
+        requestedById: ctx.userId,
+        deletedAt: { not: null },
       },
     }),
     prisma.transportationRequest.findMany({
       where: { ...baseWhere, requestedById: ctx.userId },
       orderBy: { createdAt: "desc" },
       take: 6,
+      include: { trip: { select: { status: true } } },
     }),
     prisma.transportationRequest.findMany({
       where: {
@@ -90,7 +93,7 @@ export default async function DepartmentDashboardPage() {
           </div>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">Welcome, {ctx.userName}</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Submit transportation requests electronically and monitor approval decisions and vehicle dispatches.
+            Submit transportation requests electronically, edit pending trips, or manage deleted requests in the Recycle Bin.
           </p>
         </div>
 
@@ -107,6 +110,12 @@ export default async function DepartmentDashboardPage() {
           >
             All Requests
           </Link>
+          <Link
+            href="/department/requests/recycle-bin"
+            className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Recycle Bin ({recycleBinCount})
+          </Link>
         </div>
       </div>
 
@@ -115,7 +124,7 @@ export default async function DepartmentDashboardPage() {
           { label: "My Pending", val: myPending, color: "text-amber-600", href: "/department/requests?scope=mine&status=PENDING" },
           { label: "My Approved", val: myApproved, color: "text-emerald-600", href: "/department/requests?scope=mine&status=APPROVED" },
           { label: `${ctx.departmentName} Total`, val: deptTotal, color: "text-slate-900", href: "/department/requests?scope=department" },
-          { label: "Completed Trips", val: completedTrips, color: "text-blue-600", href: "/department/requests?scope=mine" },
+          { label: "Recycle Bin", val: recycleBinCount, color: "text-rose-600", href: "/department/requests/recycle-bin" },
         ].map((card) => (
           <Link
             key={card.label}
@@ -173,7 +182,7 @@ export default async function DepartmentDashboardPage() {
 
         {recentRequests.length === 0 ? (
           <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-            <p className="text-sm font-semibold text-slate-800">No transportation requests submitted yet.</p>
+            <p className="text-sm font-semibold text-slate-800">No active transportation requests found.</p>
             <Link
               href="/department/requests/new"
               className="mt-3 inline-block rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
@@ -196,6 +205,12 @@ export default async function DepartmentDashboardPage() {
               <tbody className="divide-y divide-slate-100">
                 {recentRequests.map((req) => {
                   const meta = decodeSpecialRequirements(req.specialRequirements);
+                  const canTrash = canSoftDeleteTransportationRequest(
+                    req.status,
+                    req.trip?.status,
+                    req.deletedAt,
+                  );
+
                   return (
                     <tr key={req.id} className="hover:bg-slate-50">
                       <td className="py-3 pr-4">
@@ -223,13 +238,24 @@ export default async function DepartmentDashboardPage() {
                           {req.status}
                         </span>
                       </td>
-                      <td className="py-3 pl-4 text-right text-xs font-semibold space-x-3">
-                        <Link href={`/department/requests/${req.id}`} className="text-blue-600 hover:underline">
-                          {req.status === "PENDING" ? "Edit / View" : "Details"}
-                        </Link>
-                        <Link href={`/department/requests/new?cloneFrom=${req.id}`} className="text-slate-500 hover:text-slate-800">
-                          Clone
-                        </Link>
+                      <td className="py-3 pl-4 text-right text-xs font-semibold">
+                        <div className="inline-flex items-center gap-3">
+                          <Link href={`/department/requests/${req.id}`} className="text-blue-600 hover:underline">
+                            View
+                          </Link>
+                          {req.status === "PENDING" && (
+                            <Link
+                              href={`/department/requests/${req.id}?edit=1#edit-request-form`}
+                              className="text-amber-700 hover:underline"
+                            >
+                              Edit
+                            </Link>
+                          )}
+                          <Link href={`/department/requests/new?cloneFrom=${req.id}`} className="text-slate-500 hover:text-slate-800">
+                            Clone
+                          </Link>
+                          {canTrash && <SoftDeleteButton requestId={req.id} compact />}
+                        </div>
                       </td>
                     </tr>
                   );
