@@ -125,6 +125,11 @@ export const canHardDeleteTransportationRequest = (
   deletedAt?: Date | null,
 ) => Boolean(deletedAt) && (!tripStatus || tripStatus === "CANCELLED");
 
+export const canReviewTransportationRequest = (
+  status: TransportationRequestStatus,
+  deletedAt?: Date | null,
+) => !deletedAt && status === "PENDING";
+
 export type TripTypeOption = "ROUND_TRIP" | "ONE_WAY";
 export type PriorityOption = "STANDARD" | "URGENT";
 export type VehiclePreferenceOption =
@@ -143,20 +148,29 @@ export type StructuredRequestMeta = {
   contactPhone: string;
   cargoDetails: string;
   extraRequirements: string;
+  adminReviewNote?: string;
+  transportFlagReason?: string;
 };
 
 const META_PREFIX = "[VI-META]";
 const cleanPipe = (val: string) => val.replace(/[|\n\r]/g, " ").trim();
 
 export function encodeSpecialRequirements(meta: StructuredRequestMeta): string {
-  const header = [
+  const parts = [
     `TRIP_TYPE=${meta.tripType}`,
     `PRIORITY=${meta.priority}`,
     `VEHICLE_PREF=${meta.vehiclePreference}`,
     `CONTACT_NAME=${cleanPipe(meta.contactName)}`,
     `CONTACT_PHONE=${cleanPipe(meta.contactPhone)}`,
     `CARGO=${cleanPipe(meta.cargoDetails)}`,
-  ].join("|");
+  ];
+  if (meta.adminReviewNote?.trim()) {
+    parts.push(`ADMIN_NOTE=${cleanPipe(meta.adminReviewNote)}`);
+  }
+  if (meta.transportFlagReason?.trim()) {
+    parts.push(`TRANSPORT_FLAG=${cleanPipe(meta.transportFlagReason)}`);
+  }
+  const header = parts.join("|");
   const body = meta.extraRequirements.trim();
   return body ? `${META_PREFIX}${header}\n${body}` : `${META_PREFIX}${header}`;
 }
@@ -173,6 +187,8 @@ export function decodeSpecialRequirements(
       contactPhone: "",
       cargoDetails: "",
       extraRequirements: raw?.trim() ?? "",
+      adminReviewNote: "",
+      transportFlagReason: "",
     };
   }
 
@@ -203,6 +219,8 @@ export function decodeSpecialRequirements(
     contactPhone: map.CONTACT_PHONE ?? "",
     cargoDetails: map.CARGO ?? "",
     extraRequirements: rest.join("\n").trim(),
+    adminReviewNote: map.ADMIN_NOTE ?? "",
+    transportFlagReason: map.TRANSPORT_FLAG ?? "",
   };
 }
 
@@ -218,3 +236,13 @@ export const formatAddisDateTime = (date: Date) =>
 
 export const toAddisDateTimeLocalValue = (date: Date) =>
   new Date(date.getTime() + 3 * 3600_000).toISOString().slice(0, 16);
+
+export function formatWaitingDuration(createdAt: Date, now = new Date()): string {
+  const diffMs = Math.max(0, now.getTime() - createdAt.getTime());
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h`;
+}

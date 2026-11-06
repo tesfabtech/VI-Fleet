@@ -4,10 +4,21 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createTransportManager } from "./actions";
 
-const allowedRoles = [
+const ALLOWED_ROLES = [
   "ORGANIZATION_ADMINISTRATOR",
   "VICE_ORGANIZATION_ADMINISTRATOR",
-];
+] as const;
+
+type AllowedRole = (typeof ALLOWED_ROLES)[number];
+
+function isAllowedRole(role: unknown): role is AllowedRole {
+  return ALLOWED_ROLES.includes(role as AllowedRole);
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  TRANSPORT_MANAGER: "Transport Manager",
+  VICE_TRANSPORT_MANAGER: "Vice Transport Manager",
+};
 
 type PageProps = {
   searchParams: Promise<{
@@ -17,15 +28,22 @@ type PageProps = {
 };
 
 const messages: Record<string, string> = {
-  "invitation-sent": "The account was created and the invitation email was sent.",
+  "invitation-sent":
+    "The account was created and the invitation email was sent.",
 };
 
 const errors: Record<string, string> = {
   invalid: "Check the required fields and try again.",
   "email-used": "That email address is already associated with an account.",
-  "organization-inactive": "Your organization is inactive. Account creation is unavailable.",
-  "creation-failed": "The account could not be created or the invitation email could not be delivered. Please try again.",
+  "organization-inactive":
+    "Your organization is inactive. Account creation is unavailable.",
+  "creation-failed":
+    "The account could not be created or the invitation email could not be delivered. Please try again.",
 };
+
+const inputClass =
+  "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+const labelClass = "mb-1.5 block text-sm font-medium text-slate-700";
 
 export default async function TransportManagersPage({
   searchParams,
@@ -36,10 +54,7 @@ export default async function TransportManagersPage({
     redirect("/login");
   }
 
-  if (
-    !allowedRoles.includes(session.user.role) ||
-    !session.user.organizationId
-  ) {
+  if (!isAllowedRole(session.user.role) || !session.user.organizationId) {
     redirect("/organization");
   }
 
@@ -119,10 +134,7 @@ export default async function TransportManagersPage({
         <form action={createTransportManager} className="mt-6 space-y-5">
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
-              <label
-                htmlFor="firstName"
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="firstName" className={labelClass}>
                 Your name
               </label>
               <input
@@ -131,15 +143,12 @@ export default async function TransportManagersPage({
                 required
                 maxLength={150}
                 autoComplete="given-name"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label
-                htmlFor="middleName"
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="middleName" className={labelClass}>
                 Father&apos;s name
               </label>
               <input
@@ -147,15 +156,12 @@ export default async function TransportManagersPage({
                 name="middleName"
                 required
                 maxLength={150}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label
-                htmlFor="lastName"
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="lastName" className={labelClass}>
                 Grandfather&apos;s name
               </label>
               <input
@@ -163,15 +169,12 @@ export default async function TransportManagersPage({
                 name="lastName"
                 required
                 maxLength={150}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label
-                htmlFor="email"
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="email" className={labelClass}>
                 Email address
               </label>
               <input
@@ -181,15 +184,12 @@ export default async function TransportManagersPage({
                 required
                 maxLength={255}
                 autoComplete="email"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label
-                htmlFor="phone"
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="phone" className={labelClass}>
                 Phone number (optional)
               </label>
               <input
@@ -198,15 +198,12 @@ export default async function TransportManagersPage({
                 type="tel"
                 maxLength={30}
                 autoComplete="tel"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label
-                htmlFor="role"
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="role" className={labelClass}>
                 Role
               </label>
               <select
@@ -214,11 +211,9 @@ export default async function TransportManagersPage({
                 name="role"
                 required
                 defaultValue="TRANSPORT_MANAGER"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={`${inputClass} bg-white`}
               >
-                <option value="TRANSPORT_MANAGER">
-                  Transport Manager
-                </option>
+                <option value="TRANSPORT_MANAGER">Transport Manager</option>
                 <option value="VICE_TRANSPORT_MANAGER">
                   Vice Transport Manager
                 </option>
@@ -241,7 +236,8 @@ export default async function TransportManagersPage({
             Existing accounts
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {users.length} account{users.length === 1 ? "" : "s"} in your organization
+            {users.length} account{users.length === 1 ? "" : "s"} in your
+            organization
           </p>
         </div>
 
@@ -273,9 +269,7 @@ export default async function TransportManagersPage({
                       {user.email || "—"}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-slate-600">
-                      {user.role === "VICE_TRANSPORT_MANAGER"
-                        ? "Vice Transport Manager"
-                        : "Transport Manager"}
+                      {ROLE_LABELS[user.role] ?? user.role}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">

@@ -1,182 +1,179 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-const overviewCards = [
-  {
-    title: "Organization Settings",
-    description:
-      "View your organization profile, status, and update institutional contact details.",
-    status: "Available",
-    href: "/organization/settings",
-  },
-  {
-    title: "Departments",
-    description: "Create and manage departments within your organization.",
-    status: "Available",
-    href: "/organization/departments",
-  },
-  {
-    title: "Department Users",
-    description:
-      "Review applications, manage registration links, reassign departments, and manage user status.",
-    status: "Available",
-    href: "/organization/department-users",
-  },
-  {
-    title: "Transport Managers",
-    description:
-      "Create and manage Transport Manager and Vice Transport Manager accounts.",
-    status: "Available",
-    href: "/organization/transport-managers",
-  },
-  {
-    title: "Fleet",
-    description: "View and manage your organization's fleet.",
-    status: "Coming soon",
-  },
-  {
-    title: "Reports",
-    description: "Review fleet activity and organization reports.",
-    status: "Coming soon",
-  },
+const allowedRoles = [
+  "ORGANIZATION_ADMINISTRATOR",
+  "VICE_ORGANIZATION_ADMINISTRATOR",
 ];
 
 export default async function OrganizationDashboardPage() {
   const session = await auth();
-
-  if (!session?.user?.organizationId) {
-    redirect("/login");
-  }
+  if (!session?.user) redirect("/login");
+  if (!allowedRoles.includes(session.user.role)) notFound();
 
   const organizationId = session.user.organizationId;
+  if (!organizationId) notFound();
 
-  const [
-    organization,
-    activeDepartmentsCount,
-    departmentUsersCount,
-    pendingApplicationsCount,
-    transportManagersCount,
-  ] = await Promise.all([
-    prisma.organization.findFirst({
-      where: {
-        id: organizationId,
-        deletedAt: null,
-      },
-      select: {
-        name: true,
-        code: true,
-        status: true,
-        contactEmail: true,
-        phone: true,
-        description: true,
-      },
-    }),
-    prisma.department.count({
-      where: {
-        organizationId,
-        deletedAt: null,
-        status: "ACTIVE",
-      },
-    }),
-    prisma.user.count({
-      where: {
-        organizationId,
-        deletedAt: null,
-        role: "DEPARTMENT_USER",
-      },
-    }),
-    prisma.departmentUserApplication.count({
-      where: {
-        organizationId,
-        status: { in: ["PENDING", "UNDER_REVIEW"] },
-      },
-    }),
-    prisma.user.count({
-      where: {
-        organizationId,
-        deletedAt: null,
-        role: { in: ["TRANSPORT_MANAGER", "VICE_TRANSPORT_MANAGER"] },
-      },
-    }),
-  ]);
+  const [pendingRequests, approvedAwaitingDispatch, activeDepartments, deptUsers] =
+    await Promise.all([
+      prisma.transportationRequest.count({
+        where: { organizationId, status: "PENDING", deletedAt: null },
+      }),
+      prisma.transportationRequest.count({
+        where: {
+          organizationId,
+          status: "APPROVED",
+          deletedAt: null,
+          trip: { is: null },
+        },
+      }),
+      prisma.department.count({
+        where: { organizationId, status: "ACTIVE", deletedAt: null },
+      }),
+      prisma.user.count({
+        where: {
+          organizationId,
+          role: "DEPARTMENT_USER",
+          deletedAt: null,
+        },
+      }),
+    ]);
 
-  if (!organization) {
-    redirect("/login");
-  }
+  const overviewCards = [
+    {
+      title: "Transport Requests Review",
+      description:
+        "Review, approve, or reject transportation requests submitted by departments before dispatch.",
+      status:
+        pendingRequests > 0 ? `${pendingRequests} Pending` : "Available",
+      href: "/organization/requests",
+      highlight: pendingRequests > 0,
+    },
+    {
+      title: "Departments",
+      description: "Create and manage departments within your organization.",
+      status: `${activeDepartments} Active`,
+      href: "/organization/departments",
+    },
+    {
+      title: "Department Users",
+      description:
+        "Manage department staff accounts, applications, and registration links.",
+      status: `${deptUsers} Users`,
+      href: "/organization/department-users",
+    },
+    {
+      title: "Transport Managers",
+      description:
+        "Create and manage Transport Manager and Vice Transport Manager accounts.",
+      status: "Available",
+      href: "/organization/transport-managers",
+    },
+    {
+      title: "Organization Settings",
+      description:
+        "Manage organization profile, plan usage, theme preferences, and password security.",
+      status: "Available",
+      href: "/organization/settings",
+    },
+    {
+      title: "Fleet & Reports",
+      description: "View organization fleet analytics and operational summaries.",
+      status: "Coming soon",
+    },
+  ];
 
   return (
     <div className="space-y-8">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+      <section className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs sm:flex-row sm:items-center">
         <div>
-          <p className="text-sm font-medium text-blue-600">
-            Organization workspace
+          <p className="text-xs font-semibold tracking-wider text-blue-600 uppercase">
+            Organization Administration
           </p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
-            {organization.name}
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+            Workspace Overview
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            {organization.description ||
-              "Manage your organization profile, departments, department users, and transport managers from one place."}
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            Review department transportation requests, oversee departments and staff, and coordinate with Transport Managers.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {organization.code && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              Code: {organization.code}
-            </span>
-          )}
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              organization.status === "ACTIVE"
-                ? "bg-green-50 text-green-700"
-                : "bg-red-50 text-red-700"
-            }`}
+        <div className="flex flex-wrap gap-2.5">
+          <Link
+            href="/organization/requests?status=PENDING"
+            className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-blue-700"
           >
-            {organization.status === "ACTIVE" ? "Active" : "Inactive"}
-          </span>
+            Review Pending Requests ({pendingRequests})
+          </Link>
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Active departments</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
-            {activeDepartmentsCount}
+      {/* KPI Strip */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Link
+          href="/organization/requests?status=PENDING"
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-amber-300"
+        >
+          <p className="text-xs font-semibold text-slate-500 uppercase">
+            Pending Request Reviews
           </p>
-        </article>
+          <p className="mt-2 text-3xl font-bold text-amber-600">
+            {pendingRequests}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Awaiting Organization Admin decision →
+          </p>
+        </Link>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Department users</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
-            {departmentUsersCount}
+        <Link
+          href="/organization/requests?status=APPROVED"
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-emerald-300"
+        >
+          <p className="text-xs font-semibold text-slate-500 uppercase">
+            Approved (Awaiting Dispatch)
           </p>
-        </article>
+          <p className="mt-2 text-3xl font-bold text-emerald-600">
+            {approvedAwaitingDispatch}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Sent to Transport Manager →
+          </p>
+        </Link>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Pending applications</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-amber-600">
-            {pendingApplicationsCount}
+        <Link
+          href="/organization/departments"
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-blue-300"
+        >
+          <p className="text-xs font-semibold text-slate-500 uppercase">
+            Active Departments
           </p>
-        </article>
+          <p className="mt-2 text-3xl font-bold text-slate-900">
+            {activeDepartments}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Manage departments →</p>
+        </Link>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Transport managers</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
-            {transportManagersCount}
+        <Link
+          href="/organization/department-users"
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-blue-300"
+        >
+          <p className="text-xs font-semibold text-slate-500 uppercase">
+            Department Users
           </p>
-        </article>
-      </section>
+          <p className="mt-2 text-3xl font-bold text-blue-600">{deptUsers}</p>
+          <p className="mt-1 text-xs text-slate-500">Manage staff →</p>
+        </Link>
+      </div>
 
       <section>
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-slate-900">
-            Management tools
+            Management Tools
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            Your organization administration features.
+            Access your organization administration modules.
           </p>
         </div>
 
@@ -189,10 +186,12 @@ export default async function OrganizationDashboardPage() {
                     {card.title}
                   </h4>
                   <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                      card.href
-                        ? "bg-blue-50 text-blue-700"
-                        : "bg-slate-100 text-slate-500"
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      card.highlight
+                        ? "bg-amber-100 text-amber-800"
+                        : card.href
+                          ? "bg-blue-50 text-blue-700"
+                          : "bg-slate-100 text-slate-500"
                     }`}
                   >
                     {card.status}
@@ -209,14 +208,14 @@ export default async function OrganizationDashboardPage() {
               <Link
                 key={card.title}
                 href={card.href}
-                className="block rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="block rounded-xl border border-slate-200 bg-white p-6 shadow-xs transition hover:border-blue-300 hover:shadow-md"
               >
                 {content}
               </Link>
             ) : (
               <article
                 key={card.title}
-                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+                className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs"
               >
                 {content}
               </article>
