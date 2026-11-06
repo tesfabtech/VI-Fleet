@@ -170,42 +170,44 @@ export default async function AdminDashboardPage() {
         ) : (
           <div className="divide-y divide-gray-100">
             {recentApplications.map((application) => (
-                <div
-                  key={application.id}
-                  className="flex flex-col justify-between gap-3 px-5 py-4 transition hover:bg-gray-50 sm:flex-row sm:items-center sm:px-6"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-gray-900">
-                      {application.organizationName}
-                    </p>
+              <div
+                key={application.id}
+                className="flex flex-col justify-between gap-3 px-5 py-4 transition hover:bg-gray-50 sm:flex-row sm:items-center sm:px-6"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {application.organizationName}
+                  </p>
 
-                    <p className="mt-1 truncate text-sm text-gray-500">
-                      {application.contactEmail}
-                    </p>
+                  <p className="mt-1 truncate text-sm text-gray-500">
+                    {application.contactEmail}
+                  </p>
 
-                    <p className="mt-1 text-xs text-gray-400">
-                      Submitted{" "}
-                      {application.submittedAt.toLocaleDateString()}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 sm:justify-end">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles[application.status] ??
-                        "bg-gray-100 text-gray-700"}`}
-                    >
-                      {application.status.replaceAll("_", " ")}
-                    </span>
-
-                    <Link
-                      href={`/admin/applications/${application.id}`}
-                      className="whitespace-nowrap text-sm font-semibold text-blue-700 hover:text-blue-800"
-                    >
-                      Review →
-                    </Link>
-                  </div>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Submitted{" "}
+                    {application.submittedAt.toLocaleDateString()}
+                  </p>
                 </div>
-              ))}
+
+                <div className="flex items-center justify-between gap-4 sm:justify-end">
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      statusStyles[application.status] ??
+                      "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {application.status.replaceAll("_", " ")}
+                  </span>
+
+                  <Link
+                    href={`/admin/applications/${application.id}`}
+                    className="whitespace-nowrap text-sm font-semibold text-blue-700 hover:text-blue-800"
+                  >
+                    Review →
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
