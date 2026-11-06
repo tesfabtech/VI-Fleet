@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:seed": "prisma db seed --config prisma7.config.ts",
+    "test:maintenance": "node --import tsx --test lib/maintenance/business-logic.test.ts",
+    "test:vehicles": "node --import tsx --test lib/vehicles/validation.test.ts lib/vehicles/business-logic.test.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -32,5 +35,11 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.0": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.10.0": true,
+    "unrs-resolver@1.12.2": true
   }
 }

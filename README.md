@@ -20,6 +20,16 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Vehicle management
+
+Transport Managers and Vice Transport Managers can register and update
+vehicles only within their active organization. System Administrators select
+an active organization before managing its vehicles. Registration numbers and
+VINs are checked for duplicates among active vehicles in that organization.
+Vehicles with scheduled or in-progress trips must remain active and assigned;
+inactive and maintenance vehicles are unavailable. Vehicle updates also
+refresh the maintenance views that use vehicle odometer and status information.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
