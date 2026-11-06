@@ -71,7 +71,7 @@ export default function MaintenanceRecordForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="vehicleId" className="mb-1 block text-sm font-medium text-slate-700">
-            Vehicle *
+            Vehicle on maintenance *
           </label>
           <select
             id="vehicleId"

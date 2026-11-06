@@ -27,6 +27,7 @@ export default async function NewMaintenanceRecordPage() {
     where: {
       organizationId: access.context.organizationId,
       deletedAt: null,
+      status: "MAINTENANCE",
     },
     orderBy: { registrationNumber: "asc" },
     select: { id: true, registrationNumber: true },
@@ -56,7 +57,7 @@ export default async function NewMaintenanceRecordPage() {
       </header>
       {!vehicles.length ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-          Add a vehicle to this organization before recording maintenance.
+          Set a vehicle’s status to Maintenance before recording maintenance.
         </section>
       ) : (
         <MaintenanceRecordForm

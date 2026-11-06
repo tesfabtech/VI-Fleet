@@ -47,6 +47,7 @@ export default async function EditMaintenanceRecordPage({
       where: {
         organizationId: access.context.organizationId,
         deletedAt: null,
+        status: "MAINTENANCE",
       },
       orderBy: { registrationNumber: "asc" },
       select: { id: true, registrationNumber: true },

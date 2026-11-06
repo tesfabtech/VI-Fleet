@@ -4,7 +4,7 @@ import ManagementDashboardShell from "@/components/dashboard/management-dashboar
 
 const navigation = [
   { label: "Overview", href: "/transport" },
-  { label: "Vehicles" },
+  { label: "Vehicles", href: "/transport/vehicles" },
   { label: "Drivers", href: "/transport/drivers" },
   { label: "Trips" },
   { label: "Maintenance", href: "/transport/maintenance" },
