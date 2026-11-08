@@ -1,8 +1,11 @@
+import Link from "next/link";
+
 const overviewCards = [
   {
     title: "Vehicles",
     description: "Manage vehicle records and fleet information.",
-    status: "Coming soon",
+    status: "Available",
+    href: "/transport/vehicles",
   },
   {
     title: "Drivers",
@@ -58,25 +61,38 @@ export default function TransportDashboardPage() {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {overviewCards.map((card) => (
-            <article
-              key={card.title}
-              className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-300 hover:shadow-md"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <h4 className="text-base font-semibold text-slate-900">
-                  {card.title}
-                </h4>
-                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                  {card.status}
-                </span>
-              </div>
-
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                {card.description}
-              </p>
-            </article>
-          ))}
+          {overviewCards.map((card) => {
+            const content = (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <h4 className="text-base font-semibold text-slate-900">
+                    {card.title}
+                  </h4>
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
+                    {card.status}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  {card.description}
+                </p>
+              </>
+            );
+            const className =
+              "block rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-300 hover:shadow-md";
+            return card.href ? (
+              <Link
+                key={card.title}
+                href={card.href}
+                className={className}
+              >
+                {content}
+              </Link>
+            ) : (
+              <article key={card.title} className={className}>
+                {content}
+              </article>
+            );
+          })}
         </div>
       </section>
     </div>
