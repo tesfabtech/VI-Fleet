@@ -21,22 +21,27 @@ export default function DashboardSidebar({
 
   return (
     <>
-      <aside className="hidden min-h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="flex h-20 items-center border-b border-slate-200 px-6">
+      <aside className="hidden min-h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+        <div className="flex h-16 items-center border-b border-slate-200 px-5">
           <Link
             href={brand === "Organization" ? "/organization" : "/transport"}
-            className="text-xl font-bold tracking-tight text-slate-900"
+            className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-900"
           >
-            VI-<span className="text-blue-600">Fleet</span>
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white shadow-xs">
+              V
+            </div>
+            <span>
+              VI-<span className="text-blue-600">Fleet</span>
+            </span>
           </Link>
         </div>
 
-        <div className="px-5 py-5">
-          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <div className="px-3 py-4">
+          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             {brand} workspace
           </p>
 
-          <nav className="space-y-1">
+          <nav className="space-y-0.5">
             {navigation.map((item) => {
               const active =
                 item.href !== undefined &&
@@ -45,9 +50,9 @@ export default function DashboardSidebar({
                     item.href !== "/transport" &&
                     pathname.startsWith(`${item.href}/`)));
 
-              const className = `flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+              const className = `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition ${
                 active
-                  ? "bg-blue-50 text-blue-700"
+                  ? "bg-blue-50 text-blue-700 font-semibold"
                   : item.href
                     ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     : "cursor-not-allowed text-slate-400"
@@ -72,7 +77,7 @@ export default function DashboardSidebar({
                   title="This section is not available yet"
                 >
                   <span>{item.label}</span>
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-400">
+                  <span className="rounded bg-slate-100 px-1 py-0.5 text-[9px] font-semibold uppercase text-slate-400">
                     Soon
                   </span>
                 </div>
@@ -81,15 +86,16 @@ export default function DashboardSidebar({
           </nav>
         </div>
 
-        <div className="mt-auto border-t border-slate-200 p-5">
-          <p className="text-xs text-slate-500">Fleet management platform</p>
-          <p className="mt-1 text-xs font-medium text-slate-700">
-            VI-Fleet
+        <div className="mt-auto border-t border-slate-200 p-4">
+          <p className="text-[11px] text-slate-400">Fleet Management System</p>
+          <p className="mt-0.5 text-xs font-medium text-slate-600">
+            VI-Fleet Platform
           </p>
         </div>
       </aside>
 
-      <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+      {/* Mobile Horizontal Navigation */}
+      <nav className="flex gap-1.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 md:hidden">
         {navigation.map((item) => {
           const active =
             item.href !== undefined &&
@@ -98,12 +104,12 @@ export default function DashboardSidebar({
                 item.href !== "/transport" &&
                 pathname.startsWith(`${item.href}/`)));
 
-          const className = `shrink-0 rounded-lg px-3 py-2 text-sm font-medium ${
+          const className = `shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
             active
-              ? "bg-blue-50 text-blue-700"
+              ? "bg-blue-50 text-blue-700 font-semibold"
               : item.href
-                ? "text-slate-600"
-                : "text-slate-400"
+                ? "text-slate-600 hover:bg-slate-100"
+                : "text-slate-400 cursor-not-allowed"
           }`;
 
           return item.href ? (

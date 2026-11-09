@@ -24,26 +24,26 @@ export default function ManagementDashboardShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white">
-          <div className="flex min-h-20 items-center justify-between gap-4 px-5 py-3 sm:px-8">
+          <div className="flex min-h-16 items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                 {brand} dashboard
               </p>
-              <h1 className="mt-1 text-lg font-semibold text-slate-900">
+              <h1 className="mt-0.5 text-base font-bold text-slate-900">
                 Welcome back
               </h1>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <div className="hidden text-right sm:block">
-                <p className="max-w-48 truncate text-sm font-semibold text-slate-800">
+                <p className="max-w-48 truncate text-xs font-semibold text-slate-800">
                   {userName}
                 </p>
-                <p className="text-xs text-slate-500">{roleLabel}</p>
+                <p className="text-[11px] text-slate-500">{roleLabel}</p>
               </div>
 
               <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700"
                 aria-hidden="true"
               >
                 {userName.trim().charAt(0).toUpperCase() || "U"}
@@ -51,14 +51,14 @@ export default function ManagementDashboardShell({
             </div>
           </div>
 
-          <div className="border-t border-slate-100 px-5 py-2 sm:px-8 sm:hidden">
-            <p className="truncate text-xs text-slate-500">
+          <div className="border-t border-slate-100 px-4 py-1.5 sm:px-6 sm:hidden">
+            <p className="truncate text-[11px] text-slate-500">
               {userName} · {roleLabel}
             </p>
           </div>
         </header>
 
-        <main className="flex-1 p-5 sm:p-8">
+        <main className="flex-1 p-4 sm:p-6">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
