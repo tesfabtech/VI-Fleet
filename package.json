@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:seed": "prisma db seed --config prisma7.config.ts",
     "test:maintenance": "node --import tsx --test lib/maintenance/business-logic.test.ts",
-    "test:vehicles": "node --import tsx --test lib/vehicles/validation.test.ts lib/vehicles/business-logic.test.ts"
+    "test:vehicles": "node --import tsx --test lib/vehicles/validation.test.ts lib/vehicles/business-logic.test.ts",
+    "test:reports": "node --import tsx --test lib/reports/business-logic.test.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

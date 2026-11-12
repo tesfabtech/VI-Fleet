@@ -9,7 +9,7 @@ const navigation = [
   { label: "Trips" },
   { label: "Maintenance", href: "/transport/maintenance" },
   { label: "Fuel Records" },
-  { label: "Reports" },
+  { label: "Reports", href: "/transport/reports" },
 ];
 
 export default async function TransportLayout({
