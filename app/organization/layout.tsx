@@ -14,7 +14,7 @@ const navigation = [
   },
   { label: "Transport Managers", href: "/organization/transport-managers" },
   { label: "Fleet" },
-  { label: "Reports" },
+  { label: "Reports", href: "/organization/reports" },
   { label: "Settings", href: "/organization/settings" },
 ];
 
