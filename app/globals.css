@@ -1,13 +1,47 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-vi-theme="dark"], [data-vi-theme="dark"] *));
+
+@theme {
+  --color-vi-navy: #142B45;
+  --color-vi-blue: #245B85;
+  --color-vi-amber: #E6A23C;
+  --color-vi-light: #F4F6F8;
+  --color-vi-white: #FFFFFF;
+}
+
 :root {
   --background: #ffffff;
-  --foreground: #0f172a;
+  --foreground: #142B45;
+  --vi-navy: #142B45;
+  --vi-blue: #245B85;
+  --vi-amber: #E6A23C;
+  --vi-light: #F4F6F8;
+  --vi-white: #FFFFFF;
   --vi-accent-50: #eff6ff;
   --vi-accent-100: #dbeafe;
   --vi-accent-600: #2563eb;
   --vi-accent-700: #1d4ed8;
   --vi-accent-800: #1e40af;
+}
+
+/* Scoped classes for VI-Fleet Public Pages */
+.vi-public {
+  --public-navy: var(--vi-navy);
+  --public-blue: var(--vi-blue);
+  --public-amber: var(--vi-amber);
+  --public-light: var(--vi-light);
+  --public-white: var(--vi-white);
+}
+
+.vi-homepage {
+  background-color: var(--vi-white);
+  color: var(--vi-navy);
+}
+
+.vi-login {
+  background-color: var(--vi-light);
+  color: var(--vi-navy);
 }
 
 html {
@@ -100,9 +134,9 @@ html[data-vi-theme="dark"] .vi-workspace .border-gray-100 {
   border-color: #1f2937 !important;
 }
 
-html[data-vi-theme="dark"] .vi-workspace .divide-slate-200 > :not(:last-child),
-html[data-vi-theme="dark"] .vi-workspace .divide-gray-200 > :not(:last-child),
-html[data-vi-theme="dark"] .vi-workspace .divide-slate-100 > :not(:last-child) {
+html[data-vi-theme="dark"] .vi-workspace .divide-slate-200> :not(:last-child),
+html[data-vi-theme="dark"] .vi-workspace .divide-gray-200> :not(:last-child),
+html[data-vi-theme="dark"] .vi-workspace .divide-slate-100> :not(:last-child) {
   border-color: #1f2937 !important;
 }
 
@@ -138,6 +172,217 @@ html[data-vi-theme="dark"] .vi-workspace .bg-blue-50 {
   background-color: rgba(37, 99, 235, 0.18) !important;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Dark Theme Overrides for Public Homepage (.vi-homepage)
+   ───────────────────────────────────────────────────────────── */
+html[data-vi-theme="dark"] .vi-homepage {
+  background-color: #0b1120 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Header */
+html[data-vi-theme="dark"] .vi-public header {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  border-color: #1e293b !important;
+}
+
+html[data-vi-theme="dark"] .vi-public header .text-\[\#142B45\] {
+  color: #f8fafc !important;
+}
+
+html[data-vi-theme="dark"] .vi-public header .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+html[data-vi-theme="dark"] .vi-public header .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+html[data-vi-theme="dark"] .vi-public header .hover\:text-\[\#142B45\]:hover {
+  color: #ffffff !important;
+}
+
+html[data-vi-theme="dark"] .vi-public header .hover\:bg-slate-50:hover,
+html[data-vi-theme="dark"] .vi-public header .hover\:bg-slate-100:hover {
+  background-color: #1e293b !important;
+}
+
+html[data-vi-theme="dark"] .vi-public header .bg-white {
+  background-color: #0f172a !important;
+}
+
+html[data-vi-theme="dark"] .vi-public header .border-slate-200 {
+  border-color: #1e293b !important;
+}
+
+/* Platform Showcase */
+html[data-vi-theme="dark"] .vi-homepage #platform {
+  background-color: #0b1120 !important;
+  border-color: #1e293b !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #platform .bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #platform .bg-\[\#F4F6F8\] {
+  background-color: #0f172a !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #platform .text-\[\#142B45\] {
+  color: #f8fafc !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #platform .border-slate-200 {
+  border-color: #334155 !important;
+}
+
+/* Core Features */
+html[data-vi-theme="dark"] .vi-homepage #features {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #features .bg-white {
+  background-color: #0f172a !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #features .bg-\[\#F4F6F8\] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #features .bg-\[\#F4F6F8\]\/60 {
+  background-color: rgba(30, 41, 59, 0.7) !important;
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #features .text-\[\#142B45\] {
+  color: #f8fafc !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #features .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #features .border-slate-200,
+html[data-vi-theme="dark"] .vi-homepage #features .border-slate-200\/90,
+html[data-vi-theme="dark"] .vi-homepage #features .border-slate-200\/80,
+html[data-vi-theme="dark"] .vi-homepage #features .border-slate-200\/60 {
+  border-color: #334155 !important;
+}
+
+/* How It Works */
+html[data-vi-theme="dark"] .vi-homepage #how-it-works {
+  background-color: #080d1a !important;
+  border-color: #1e293b !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #how-it-works .bg-white {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #how-it-works .text-\[\#142B45\] {
+  color: #f8fafc !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #how-it-works .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #how-it-works .bg-\[\#F4F6F8\] {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #how-it-works .border-slate-100,
+html[data-vi-theme="dark"] .vi-homepage #how-it-works .border-slate-200 {
+  border-color: #334155 !important;
+}
+
+/* Benefits */
+html[data-vi-theme="dark"] .vi-homepage #benefits {
+  background-color: #0b1120 !important;
+  border-color: #1e293b !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #benefits .bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #benefits .text-\[\#142B45\] {
+  color: #f8fafc !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #benefits .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #benefits .border-slate-200,
+html[data-vi-theme="dark"] .vi-homepage #benefits .border-slate-200\/90,
+html[data-vi-theme="dark"] .vi-homepage #benefits .border-slate-200\/80 {
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #benefits span.bg-white {
+  background-color: #1e293b !important;
+  color: #60a5fa !important;
+  border-color: #334155 !important;
+}
+
+/* FAQ */
+html[data-vi-theme="dark"] .vi-homepage #faq {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #faq .bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #faq .bg-\[\#F4F6F8\] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #faq .bg-\[\#F4F6F8\]\/60 {
+  background-color: rgba(15, 23, 42, 0.7) !important;
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #faq .text-\[\#142B45\] {
+  color: #f8fafc !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #faq .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #faq .border-slate-100,
+html[data-vi-theme="dark"] .vi-homepage #faq .border-slate-200,
+html[data-vi-theme="dark"] .vi-homepage #faq .border-slate-200\/80 {
+  border-color: #334155 !important;
+}
+
+html[data-vi-theme="dark"] .vi-homepage #faq .hover\:bg-slate-50\/70:hover {
+  background-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+/* Register Banner */
+html[data-vi-theme="dark"] .vi-homepage section.bg-white {
+  background-color: #0b1120 !important;
+}
+
+/* Footer */
+html[data-vi-theme="dark"] .vi-homepage footer {
+  background-color: #080d1a !important;
+  border-color: #1e293b !important;
+}
+
 body {
   background-color: #ffffff;
   color: var(--foreground);
@@ -146,7 +391,7 @@ body {
 }
 
 .bg-grid-pattern {
-  background-image: 
+  background-image:
     linear-gradient(to right, rgba(203, 213, 225, 0.45) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(203, 213, 225, 0.45) 1px, transparent 1px);
   background-size: 2.5rem 2.5rem;
@@ -161,13 +406,16 @@ body {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 9999px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
