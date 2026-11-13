@@ -171,6 +171,35 @@ export async function updateDriverProfile(formData: FormData): Promise<void> {
     respond(path, "error", "license-exists");
   }
 
+  let newPreferredVehicleId: string | null | undefined = undefined;
+  if (formData.has("preferredVehicleId")) {
+    const preferredInput = normalizeText(formData.get("preferredVehicleId"));
+    if (!preferredInput || preferredInput === "none") {
+      newPreferredVehicleId = null;
+    } else if (UUID_RE.test(preferredInput)) {
+      const vehicle = await prisma.vehicle.findFirst({
+        where: {
+          id: preferredInput,
+          organizationId,
+          deletedAt: null,
+        },
+        select: { id: true, status: true },
+      });
+
+      if (!vehicle) {
+        respond(path, "error", "vehicle-not-found");
+      }
+
+      if (vehicle.status !== "ACTIVE") {
+        respond(path, "error", "vehicle-not-active");
+      }
+
+      newPreferredVehicleId = vehicle.id;
+    } else {
+      respond(path, "error", "invalid-vehicle-id");
+    }
+  }
+
   try {
     await prisma.$transaction(async (tx) => {
       await tx.driver.update({
@@ -182,6 +211,9 @@ export async function updateDriverProfile(formData: FormData): Promise<void> {
           licenseNumber,
           licenseExpiryDate,
           notes: notes || null,
+          ...(newPreferredVehicleId !== undefined
+            ? { preferredVehicleId: newPreferredVehicleId }
+            : {}),
         },
       });
 
@@ -500,4 +532,126 @@ export async function resendDriverVerificationEmail(
   revalidatePath(`${BASE_PATH}/${driverId}`);
   respond(path, "message", "verification-resent");
 }
+
+export async function updateDriverPreferredVehicle(
+  formData: FormData,
+): Promise<void> {
+  const driverId = normalizeText(formData.get("driverId"));
+  const defaultPath = driverId ? `${BASE_PATH}/${driverId}` : BASE_PATH;
+  const path = resolveReturnPath(formData, defaultPath);
+  const { organizationId } = await requireTransportManager(path);
+
+  if (!UUID_RE.test(driverId)) {
+    respond(path, "error", "invalid-id");
+  }
+
+  const actionType = normalizeText(formData.get("action"));
+  const vehicleIdInput = normalizeText(formData.get("vehicleId"));
+
+  const driver = await prisma.driver.findFirst({
+    where: {
+      id: driverId,
+      organizationId,
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (!driver) {
+    respond(path, "error", "driver-not-found");
+  }
+
+  // Handle Removal
+  if (
+    actionType === "remove" ||
+    vehicleIdInput === "" ||
+    vehicleIdInput === "none"
+  ) {
+    await prisma.driver.update({
+      where: { id: driver.id },
+      data: { preferredVehicleId: null },
+    });
+
+    revalidatePath(BASE_PATH);
+    revalidatePath(`${BASE_PATH}/${driverId}`);
+    revalidatePath(`${BASE_PATH}/${driverId}/edit`);
+    respond(path, "message", "preferred-vehicle-removed");
+  }
+
+  // Handle Assignment / Update
+  if (!UUID_RE.test(vehicleIdInput)) {
+    respond(path, "error", "invalid-vehicle-id");
+  }
+
+  const vehicle = await prisma.vehicle.findFirst({
+    where: {
+      id: vehicleIdInput,
+      organizationId,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      status: true,
+    },
+  });
+
+  if (!vehicle) {
+    respond(path, "error", "vehicle-not-found");
+  }
+
+  if (vehicle.status !== "ACTIVE") {
+    respond(path, "error", "vehicle-not-active");
+  }
+
+  await prisma.driver.update({
+    where: { id: driver.id },
+    data: {
+      preferredVehicleId: vehicle.id,
+    },
+  });
+
+  revalidatePath(BASE_PATH);
+  revalidatePath(`${BASE_PATH}/${driverId}`);
+  revalidatePath(`${BASE_PATH}/${driverId}/edit`);
+  respond(path, "message", "preferred-vehicle-updated");
+}
+
+export async function removeDriverPreferredVehicle(
+  formData: FormData,
+): Promise<void> {
+  const driverId = normalizeText(formData.get("driverId"));
+  const defaultPath = driverId ? `${BASE_PATH}/${driverId}` : BASE_PATH;
+  const path = resolveReturnPath(formData, defaultPath);
+  const { organizationId } = await requireTransportManager(path);
+
+  if (!UUID_RE.test(driverId)) {
+    respond(path, "error", "invalid-id");
+  }
+
+  const driver = await prisma.driver.findFirst({
+    where: {
+      id: driverId,
+      organizationId,
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (!driver) {
+    respond(path, "error", "driver-not-found");
+  }
+
+  await prisma.driver.update({
+    where: { id: driver.id },
+    data: {
+      preferredVehicleId: null,
+    },
+  });
+
+  revalidatePath(BASE_PATH);
+  revalidatePath(`${BASE_PATH}/${driverId}`);
+  revalidatePath(`${BASE_PATH}/${driverId}/edit`);
+  respond(path, "message", "preferred-vehicle-removed");
+}
+
 

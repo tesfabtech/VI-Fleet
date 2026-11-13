@@ -27,6 +27,9 @@ const ERROR_MESSAGES: Record<string, string> = {
     "That license number is already registered to another driver in your organization.",
   "driver-not-found": "Driver record not found.",
   "update-failed": "Could not update the driver. Please try again.",
+  "invalid-vehicle-id": "The selected vehicle is invalid.",
+  "vehicle-not-found": "The selected vehicle was not found in your organization.",
+  "vehicle-not-active": "Only active vehicles can be assigned as preferred.",
 };
 
 export default async function EditDriverPage({
@@ -55,26 +58,55 @@ export default async function EditDriverPage({
   const query = await searchParams;
   const organizationId = sessionUser.organizationId;
 
-  const driver = await prisma.driver.findFirst({
-    where: {
-      id,
-      organizationId,
-      deletedAt: null,
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          firstName: true,
-          middleName: true,
-          lastName: true,
-          email: true,
-          pendingEmail: true,
-          phone: true,
+  const [driver, activeVehicles] = await Promise.all([
+    prisma.driver.findFirst({
+      where: {
+        id,
+        organizationId,
+        deletedAt: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            middleName: true,
+            lastName: true,
+            email: true,
+            pendingEmail: true,
+            phone: true,
+          },
+        },
+        preferredVehicle: {
+          select: {
+            id: true,
+            registrationNumber: true,
+            make: true,
+            model: true,
+            vehicleType: true,
+            status: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.vehicle.findMany({
+      where: {
+        organizationId,
+        status: "ACTIVE",
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        registrationNumber: true,
+        make: true,
+        model: true,
+        vehicleType: true,
+      },
+      orderBy: {
+        registrationNumber: "asc",
+      },
+    }),
+  ]);
 
   if (!driver) {
     notFound();
@@ -269,6 +301,51 @@ export default async function EditDriverPage({
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
+          </div>
+        </section>
+
+        <div className="border-t border-gray-200" />
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">
+              Vehicle preferences
+            </h2>
+            <p className="mt-1 text-xs text-gray-500">
+              Optional recommendation for future trip assignments. Drivers can still be assigned other vehicles as needed.
+            </p>
+          </div>
+
+          <div>
+            <label
+              htmlFor="preferredVehicleId"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Preferred vehicle
+            </label>
+            <select
+              id="preferredVehicleId"
+              name="preferredVehicleId"
+              defaultValue={driver.preferredVehicleId || ""}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">No preferred vehicle (unassigned)</option>
+              {driver.preferredVehicle &&
+                driver.preferredVehicle.status !== "ACTIVE" && (
+                  <option
+                    key={driver.preferredVehicle.id}
+                    value={driver.preferredVehicle.id}
+                    disabled
+                  >
+                    {driver.preferredVehicle.registrationNumber} — {[driver.preferredVehicle.make, driver.preferredVehicle.model].filter(Boolean).join(" ")} ({driver.preferredVehicle.status} — currently inactive)
+                  </option>
+                )}
+              {activeVehicles.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {vehicle.registrationNumber} — {[vehicle.make, vehicle.model].filter(Boolean).join(" ")} ({vehicle.vehicleType || "Vehicle"})
+                </option>
+              ))}
+            </select>
           </div>
         </section>
 

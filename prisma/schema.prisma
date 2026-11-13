@@ -429,6 +429,7 @@ model Vehicle {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  preferredDrivers     Driver[]              @relation("DriverPreferredVehicle")
   trips                Trip[]
   gpsDevices           GPSDevice[]
   gpsLocations         GPSLocation[]
@@ -455,6 +456,7 @@ model Driver {
   id             String       @id @default(uuid()) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   userId         String?      @map("user_id") @db.Uuid
+  preferredVehicleId String? @map("preferred_vehicle_id") @db.Uuid
 
   firstName         String    @map("first_name") @db.VarChar(100)
   lastName          String    @map("last_name") @db.VarChar(100)
@@ -474,6 +476,8 @@ model Driver {
 
   user User? @relation(fields: [organizationId, userId], references: [organizationId, id], onDelete: Restrict)
 
+  preferredVehicle Vehicle? @relation("DriverPreferredVehicle", fields: [organizationId, preferredVehicleId], references: [organizationId, id], onDelete: Restrict)
+  
   trips  Trip[]
   alerts Alert[]
 
@@ -482,6 +486,7 @@ model Driver {
 
   @@index([organizationId])
   @@index([organizationId, status])
+  @@index([organizationId, preferredVehicleId])
 
   @@map("drivers")
 }

@@ -165,6 +165,9 @@ function getNotice(searchParams: {
     "account-status-updated": "Driver user account status was updated.",
     "invitation-resent": "Password setup invitation email was resent.",
     "verification-resent": "Email verification link was resent.",
+    "preferred-vehicle-updated":
+      "Driver preferred vehicle was successfully updated.",
+    "preferred-vehicle-removed": "Driver preferred vehicle was removed.",
   };
 
   if (searchParams.message && messages[searchParams.message]) {
@@ -193,6 +196,10 @@ function getNotice(searchParams: {
     throttled: "Please wait at least 2 minutes before resending another email.",
     "invitation-send-failed": "Could not send the invitation email.",
     "verification-send-failed": "Could not send the verification email.",
+    "invalid-vehicle-id": "The selected vehicle is invalid.",
+    "vehicle-not-found": "Vehicle not found in your organization.",
+    "vehicle-not-active":
+      "Only active vehicles can be assigned as a preferred vehicle.",
   };
 
   if (searchParams.error && errorMessages[searchParams.error]) {
@@ -268,6 +275,17 @@ export default async function DriversPage({
       { lastName: { contains: q, mode: "insensitive" } },
       { phone: { contains: q, mode: "insensitive" } },
       { licenseNumber: { contains: q, mode: "insensitive" } },
+      {
+        preferredVehicle: {
+          is: {
+            OR: [
+              { registrationNumber: { contains: q, mode: "insensitive" } },
+              { make: { contains: q, mode: "insensitive" } },
+              { model: { contains: q, mode: "insensitive" } },
+            ],
+          },
+        },
+      },
       {
         user: {
           is: {
@@ -353,6 +371,14 @@ export default async function DriversPage({
         licenseExpiryDate: true,
         status: true,
         createdAt: true,
+        preferredVehicle: {
+          select: {
+            id: true,
+            registrationNumber: true,
+            make: true,
+            model: true,
+          },
+        },
         user: {
           select: {
             id: true,
@@ -616,6 +642,7 @@ export default async function DriversPage({
                   <th className="px-5 py-3">Driver</th>
                   <th className="px-5 py-3">Contact</th>
                   <th className="px-5 py-3">License</th>
+                  <th className="px-5 py-3">Preferred vehicle</th>
                   <th className="px-5 py-3">Driver status</th>
                   <th className="px-5 py-3">Account status</th>
                   <th className="px-5 py-3 text-right">Actions</th>
@@ -706,6 +733,30 @@ export default async function DriversPage({
                             {formatDate(driver.licenseExpiryDate)}
                           </span>
                         </div>
+                      </td>
+
+                      {/* Preferred Vehicle */}
+                      <td className="whitespace-nowrap px-5 py-4">
+                        {driver.preferredVehicle ? (
+                          <div>
+                            <Link
+                              href={`/transport/vehicles/${driver.preferredVehicle.id}`}
+                              className="font-mono text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {driver.preferredVehicle.registrationNumber}
+                            </Link>
+                            <p className="mt-0.5 text-xs text-gray-500">
+                              {[
+                                driver.preferredVehicle.make,
+                                driver.preferredVehicle.model,
+                              ]
+                                .filter(Boolean)
+                                .join(" ") || "Vehicle"}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">None</span>
+                        )}
                       </td>
 
                       {/* Operational Driver Status */}
