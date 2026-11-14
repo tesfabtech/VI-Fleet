@@ -4,9 +4,9 @@ import ManagementDashboardShell from "@/components/dashboard/management-dashboar
 
 const navigation = [
   { label: "Overview", href: "/transport" },
+  { label: "Trips", href: "/transport/trips" },
   { label: "Vehicles", href: "/transport/vehicles" },
   { label: "Drivers", href: "/transport/drivers" },
-  { label: "Trips" },
   { label: "Maintenance", href: "/transport/maintenance" },
   { label: "Fuel Records" },
   { label: "Reports" },
@@ -35,10 +35,10 @@ export default async function TransportLayout({
     <ManagementDashboardShell
       brand="Transport"
       roleLabel={
-        session.user.role === "SYSTEM_ADMINISTRATOR"
-          ? "System Administrator"
-          : session.user.role === "VICE_TRANSPORT_MANAGER"
-            ? "Vice Transport Manager"
+        session.user.role === "VICE_TRANSPORT_MANAGER"
+          ? "Vice Transport Manager"
+          : session.user.role === "SYSTEM_ADMINISTRATOR"
+            ? "System Administrator"
             : "Transport Manager"
       }
       userName={session.user.name?.trim() || "User"}
