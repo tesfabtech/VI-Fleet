@@ -27,7 +27,10 @@ export function windowsOverlapWithBuffer(
     bEnd,
     bufferMinutes,
   );
-  return aStart.getTime() < bufferedEnd.getTime() && aEnd.getTime() > bufferedStart.getTime();
+  return (
+    aStart.getTime() < bufferedEnd.getTime() &&
+    aEnd.getTime() > bufferedStart.getTime()
+  );
 }
 
 export function canTransitionTripStatus(
@@ -85,11 +88,26 @@ function matchesVehiclePreference(
 ): boolean {
   if (pref === "ANY") return true;
   const vt = (vehicleType ?? "").toUpperCase();
-  if (pref === "SEDAN") return vt.includes("SEDAN") || vt.includes("CAR") || vt.includes("AUTO");
-  if (pref === "SUV_4X4") return vt.includes("4X4") || vt.includes("SUV") || vt.includes("CRUISER") || vt.includes("PICKUP");
-  if (pref === "MINIBUS") return vt.includes("MINI") || vt.includes("HIACE") || vt.includes("VAN");
+  if (pref === "SEDAN")
+    return vt.includes("SEDAN") || vt.includes("CAR") || vt.includes("AUTO");
+  if (pref === "SUV_4X4")
+    return (
+      vt.includes("4X4") ||
+      vt.includes("SUV") ||
+      vt.includes("CRUISER") ||
+      vt.includes("PICKUP") ||
+      vt.includes("HILUX")
+    );
+  if (pref === "MINIBUS")
+    return vt.includes("MINI") || vt.includes("HIACE") || vt.includes("VAN");
   if (pref === "BUS") return vt.includes("BUS") || vt.includes("COASTER");
-  if (pref === "PICKUP_CARGO") return vt.includes("PICKUP") || vt.includes("TRUCK") || vt.includes("CARGO");
+  if (pref === "PICKUP_CARGO")
+    return (
+      vt.includes("PICKUP") ||
+      vt.includes("TRUCK") ||
+      vt.includes("CARGO") ||
+      vt.includes("HILUX")
+    );
   return false;
 }
 
@@ -121,9 +139,7 @@ export function evaluateVehicleCandidate(
 
   if (vehicle.overlappingTrips.length > 0) {
     const first = vehicle.overlappingTrips[0];
-    reasons.push(
-      `Booked (${first.destination}) within 30m turnaround window`,
-    );
+    reasons.push(`Booked (${first.destination}) within 30m turnaround window`);
   }
 
   for (const maint of vehicle.scheduledMaintenances) {
@@ -143,7 +159,9 @@ export function evaluateVehicleCandidate(
     vehiclePreference,
   );
   if (!prefMatch && vehiclePreference !== "ANY") {
-    warnings.push(`Type is ${vehicle.vehicleType || "Standard"} (requested ${vehiclePreference})`);
+    warnings.push(
+      `Type is ${vehicle.vehicleType || "Standard"} (requested ${vehiclePreference})`,
+    );
   }
 
   const eligible = reasons.length === 0;
@@ -152,7 +170,6 @@ export function evaluateVehicleCandidate(
       ? Math.max(0, vehicle.seatingCapacity - passengerCount)
       : 50;
 
-  // Lower score is better: best capacity fit first -> preference match -> fewest weekly trips
   const score =
     (eligible ? 0 : 10_000) +
     capacitySlack * 10 +
@@ -195,6 +212,8 @@ export type DriverEvaluationInput = {
   licenseExpiryDate: Date | null;
   status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   userId: string | null;
+  preferredVehicleId?: string | null;
+  preferredVehicleLabel?: string | null;
   overlappingTrips: Array<{
     id: string;
     scheduledStart: Date;
@@ -209,6 +228,8 @@ export type EvaluatedDriverCandidate = {
   label: string;
   phone: string | null;
   licenseNumber: string;
+  preferredVehicleId: string | null;
+  preferredVehicleLabel: string | null;
   eligible: boolean;
   reasons: string[];
   warnings: string[];
@@ -251,18 +272,77 @@ export function evaluateDriverCandidate(
   const eligible = reasons.length === 0;
   const score = (eligible ? 0 : 10_000) + driver.weeklyTripCount * 20;
 
+  const badgeParts = [`${driver.weeklyTripCount} trip(s) this week`];
+  if (driver.preferredVehicleLabel) {
+    badgeParts.unshift(`Preferred: ${driver.preferredVehicleLabel}`);
+  }
+  if (!driver.userId) {
+    badgeParts.push("No web login linked");
+  }
+
   return {
     id: driver.id,
     label: `${driver.firstName} ${driver.lastName} (Lic: ${driver.licenseNumber})`,
     phone: driver.phone,
     licenseNumber: driver.licenseNumber,
+    preferredVehicleId: driver.preferredVehicleId ?? null,
+    preferredVehicleLabel: driver.preferredVehicleLabel ?? null,
     eligible,
     reasons,
     warnings,
-    workloadBadge: `${driver.weeklyTripCount} trip(s) this week${
-      driver.userId ? "" : " • No web login linked"
-    }`,
+    workloadBadge: badgeParts.join(" • "),
     score,
+  };
+}
+
+export type PreferredVehicleSuggestion = {
+  suggestedVehicleId: string;
+  status: "PREFERRED_AVAILABLE" | "PREFERRED_UNAVAILABLE" | "NO_PREFERENCE";
+  message: string | null;
+};
+
+/**
+ * Resolves which vehicle to auto-suggest when a Transport Manager selects a driver:
+ * - If the driver has a preferredVehicleId and that vehicle is eligible/available for the trip,
+ *   automatically suggests the driver's preferred vehicle.
+ * - If the driver's preferred vehicle is unavailable or ineligible (e.g., booked, maintenance, or insufficient seats),
+ *   explains why and suggests the top-ranked available alternative vehicle.
+ */
+export function resolveRecommendedVehicleForDriver(
+  driver: EvaluatedDriverCandidate | undefined,
+  vehicles: EvaluatedVehicleCandidate[],
+): PreferredVehicleSuggestion {
+  const bestAvailableId = vehicles.find((v) => v.eligible)?.id ?? "";
+
+  if (!driver || !driver.preferredVehicleId) {
+    return {
+      suggestedVehicleId: bestAvailableId,
+      status: "NO_PREFERENCE",
+      message: null,
+    };
+  }
+
+  const preferred = vehicles.find((v) => v.id === driver.preferredVehicleId);
+  if (!preferred) {
+    return {
+      suggestedVehicleId: bestAvailableId,
+      status: "PREFERRED_UNAVAILABLE",
+      message: `Driver's preferred vehicle (${driver.preferredVehicleLabel || "assigned vehicle"}) is no longer active in the fleet. Suggested best available vehicle instead.`,
+    };
+  }
+
+  if (preferred.eligible) {
+    return {
+      suggestedVehicleId: preferred.id,
+      status: "PREFERRED_AVAILABLE",
+      message: `Auto-suggested ${driver.label.split(" (")[0]}'s preferred vehicle: ${preferred.label}. You can keep this suggestion or choose another available vehicle.`,
+    };
+  }
+
+  return {
+    suggestedVehicleId: bestAvailableId,
+    status: "PREFERRED_UNAVAILABLE",
+    message: `Driver's preferred vehicle (${preferred.label}) cannot be assigned for this trip (${preferred.reasons.join("; ")}). Suggested best available vehicle instead.`,
   };
 }
 

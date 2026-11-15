@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   scheduleOrReassignTrip,
   updateTripLifecycleStatus,
@@ -400,6 +400,9 @@ export function TripLifecycleControls({
   defaultOdometer?: number | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const isTransportManagerView = pathname.startsWith("/transport");
+
   const [state, formAction, isPending] = useActionState<
     TripActionState,
     FormData
@@ -412,6 +415,10 @@ export function TripLifecycleControls({
   if (currentStatus === "COMPLETED" || currentStatus === "CANCELLED") {
     return null;
   }
+
+  // Hide Start Trip on the Transport Manager dashboard (/transport/**); only show Start Trip to the Driver (/driver)
+  const showStartOrCompleteCard =
+    !(isTransportManagerView && currentStatus === "SCHEDULED");
 
   return (
     <div className="space-y-4">
@@ -433,75 +440,83 @@ export function TripLifecycleControls({
         </p>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <form
-          action={formAction}
-          className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 space-y-3"
-        >
-          <input type="hidden" name="tripId" value={tripId} />
-          <input
-            type="hidden"
-            name="targetStatus"
-            value={currentStatus === "SCHEDULED" ? "IN_PROGRESS" : "COMPLETED"}
-          />
-
-          <h3 className="text-sm font-bold text-emerald-950">
-            {currentStatus === "SCHEDULED"
-              ? "Start Trip Execution (SCHEDULED → IN_PROGRESS)"
-              : "Complete Trip (IN_PROGRESS → COMPLETED)"}
-          </h3>
-          <p className="text-xs text-emerald-800">
-            {currentStatus === "SCHEDULED"
-              ? "Marks the trip IN_PROGRESS, records actual departure time and starting odometer, and marks the vehicle ASSIGNED."
-              : "Marks the trip COMPLETED, calculates distance traveled from ending odometer, and releases the vehicle to AVAILABLE."}
-          </p>
-
-          <div>
-            <label className="block text-xs font-semibold text-emerald-950">
-              {currentStatus === "SCHEDULED"
-                ? "Starting Odometer (km)"
-                : "Ending Odometer (km)"}
-            </label>
-            <input
-              type="number"
-              name="odometer"
-              step="0.01"
-              min={defaultOdometer ?? 0}
-              defaultValue={defaultOdometer ?? ""}
-              placeholder="e.g., 45210"
-              className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm text-slate-900"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-emerald-950">
-              Execution Note (Optional)
-            </label>
-            <input
-              type="text"
-              name="statusNote"
-              maxLength={300}
-              placeholder={
-                currentStatus === "SCHEDULED"
-                  ? "All passengers boarded at Main Gate"
-                  : "Returned safely, vehicle refueled"
-              }
-              className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm text-slate-900"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isPending}
-            className="w-full rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+      <div
+        className={`grid gap-4 ${
+          showStartOrCompleteCard ? "md:grid-cols-2" : "md:grid-cols-1"
+        }`}
+      >
+        {showStartOrCompleteCard && (
+          <form
+            action={formAction}
+            className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 space-y-3"
           >
-            {isPending
-              ? "Updating..."
-              : currentStatus === "SCHEDULED"
-                ? "Start Trip Now"
-                : "Mark Trip Completed"}
-          </button>
-        </form>
+            <input type="hidden" name="tripId" value={tripId} />
+            <input
+              type="hidden"
+              name="targetStatus"
+              value={
+                currentStatus === "SCHEDULED" ? "IN_PROGRESS" : "COMPLETED"
+              }
+            />
+
+            <h3 className="text-sm font-bold text-emerald-950">
+              {currentStatus === "SCHEDULED"
+                ? "Start Trip Execution (SCHEDULED → IN_PROGRESS)"
+                : "Complete Trip (IN_PROGRESS → COMPLETED)"}
+            </h3>
+            <p className="text-xs text-emerald-800">
+              {currentStatus === "SCHEDULED"
+                ? "Marks the trip IN_PROGRESS, records actual departure time and starting odometer, and marks the vehicle ASSIGNED."
+                : "Marks the trip COMPLETED, calculates distance traveled from ending odometer, and releases the vehicle to AVAILABLE."}
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-emerald-950">
+                {currentStatus === "SCHEDULED"
+                  ? "Starting Odometer (km)"
+                  : "Ending Odometer (km)"}
+              </label>
+              <input
+                type="number"
+                name="odometer"
+                step="0.01"
+                min={defaultOdometer ?? 0}
+                defaultValue={defaultOdometer ?? ""}
+                placeholder="e.g., 45210"
+                className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm text-slate-900"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-emerald-950">
+                Execution Note (Optional)
+              </label>
+              <input
+                type="text"
+                name="statusNote"
+                maxLength={300}
+                placeholder={
+                  currentStatus === "SCHEDULED"
+                    ? "All passengers boarded at Main Gate"
+                    : "Returned safely, vehicle refueled"
+                }
+                className="mt-1 w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm text-slate-900"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isPending}
+              className="w-full rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {isPending
+                ? "Updating..."
+                : currentStatus === "SCHEDULED"
+                  ? "Start Trip Now"
+                  : "Mark Trip Completed"}
+            </button>
+          </form>
+        )}
 
         <form
           action={formAction}
