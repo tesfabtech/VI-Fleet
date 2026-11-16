@@ -1,239 +1,552 @@
+
 "use client";
 
-import { useState } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type MouseEvent,
+} from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useLoginModal } from "@/components/auth/login-modal-context";
 
+type Theme = "light" | "dark";
+
+const NAV_LINKS = [
+  { name: "Home", href: "#hero", id: "hero" },
+  { name: "Platform", href: "#platform", id: "platform" },
+  { name: "Features", href: "#features", id: "features" },
+  { name: "How It Works", href: "#how-it-works", id: "how-it-works" },
+  { name: "Benefits", href: "#benefits", id: "benefits" },
+  { name: "FAQ", href: "#faq", id: "faq" },
+];
+
+// -------------------------------------------------------------
+// Theme Store
+// -------------------------------------------------------------
+
+function getThemeSnapshot(): Theme {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  const documentTheme =
+    document.documentElement.getAttribute("data-vi-theme");
+
+  if (documentTheme === "dark" || documentTheme === "light") {
+    return documentTheme;
+  }
+
+  const savedTheme = localStorage.getItem("vi-fleet-theme");
+
+  if (savedTheme === "dark" || savedTheme === "light") {
+    return savedTheme;
+  }
+
+  if (
+    savedTheme === "system" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+
+  return "light";
+}
+
+function getServerThemeSnapshot(): Theme {
+  return "light";
+}
+
+function subscribeToTheme(callback: () => void) {
+  const handleThemeChange = () => callback();
+
+  window.addEventListener("vi-fleet-theme-change", handleThemeChange);
+  window.addEventListener("storage", handleThemeChange);
+
+  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  mediaQuery.addEventListener("change", handleThemeChange);
+
+  return () => {
+    window.removeEventListener("vi-fleet-theme-change", handleThemeChange);
+    window.removeEventListener("storage", handleThemeChange);
+    mediaQuery.removeEventListener("change", handleThemeChange);
+  };
+}
+
+// -------------------------------------------------------------
+// Theme Icons
+// -------------------------------------------------------------
+
+function SunIcon() {
+  return (
+    <svg
+      className="h-[18px] w-[18px] text-[#E6A23C]"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+      />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg
+      className="h-[18px] w-[18px] text-slate-700"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+      />
+    </svg>
+  );
+}
+
+// -------------------------------------------------------------
+// Theme Toggle Component
+// Declared outside Header to preserve component identity.
+// -------------------------------------------------------------
+
+function ThemeToggle({
+  theme,
+  onToggle,
+  mobile = false,
+}: {
+  theme: Theme;
+  onToggle: () => void;
+  mobile?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={
+        theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+      }
+      title={
+        theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+      }
+      className={`inline-flex select-none items-center justify-center rounded-lg border border-slate-200/90 bg-white/80 text-slate-700 shadow-2xs transition-colors hover:bg-slate-100 hover:text-[#142B45] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#245B85] ${
+        mobile ? "h-8 w-8 p-1.5" : "h-9 w-9 p-2"
+      }`}
+    >
+      {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+    </button>
+  );
+}
+
+// -------------------------------------------------------------
+// Header Component
+// -------------------------------------------------------------
+
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("HOME");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("Home");
+
+  const theme = useSyncExternalStore(
+    subscribeToTheme,
+    getThemeSnapshot,
+    getServerThemeSnapshot
+  );
+
   const { openLogin } = useLoginModal();
 
-  const primaryTabs = [
-    { name: "HOMEPAGE", id: "HOME", href: "#" },
-    { name: "OVERVIEW", id: "OVERVIEW", href: "#problem-value" },
-    { name: "SERVICES", id: "SERVICES", href: "#features" },
-    { name: "HOW IT WORKS", id: "HOW_IT_WORKS", href: "#how-it-works" },
-    { name: "TESTIMONIALS", id: "TESTIMONIALS", href: "#testimonials" },
-    { name: "FAQ", id: "FAQ", href: "#faq" },
-  ];
+  const isManualClick = useRef(false);
+  const clickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function handleSearchSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return;
+  // -------------------------------------------------------------
+  // Theme Toggle
+  // -------------------------------------------------------------
 
-    if (query.includes("faq") || query.includes("question") || query.includes("help")) {
-      window.location.hash = "faq";
-    } else if (query.includes("work") || query.includes("step") || query.includes("how")) {
-      window.location.hash = "how-it-works";
-    } else if (query.includes("testimoni") || query.includes("review") || query.includes("trust")) {
-      window.location.hash = "testimonials";
-    } else if (query.includes("problem") || query.includes("value") || query.includes("why") || query.includes("fuel")) {
-      window.location.hash = "problem-value";
-    } else {
-      window.location.hash = "features";
+  function toggleTheme() {
+    const nextTheme: Theme = theme === "dark" ? "light" : "dark";
+
+    localStorage.setItem("vi-fleet-theme", nextTheme);
+
+    document.documentElement.setAttribute("data-vi-theme", nextTheme);
+
+    window.dispatchEvent(new Event("vi-fleet-theme-change"));
+  }
+
+  // -------------------------------------------------------------
+  // Active Navigation: Scroll Tracking and URL Hash
+  // -------------------------------------------------------------
+
+  useEffect(() => {
+    const sectionIds = NAV_LINKS.map((link) => link.id);
+
+    const elements = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter((element): element is HTMLElement => Boolean(element));
+
+    if (elements.length === 0) return;
+
+    const entryMap = new Map<string, IntersectionObserverEntry>();
+
+    // Respect the URL hash on initial page load.
+    const initialHashFrame = window.requestAnimationFrame(() => {
+      const initialHash = window.location.hash;
+
+      const found = NAV_LINKS.find(
+        (link) => link.href === initialHash
+      );
+
+      if (found) {
+        setActiveTab(found.name);
+      }
+    });
+
+    const updateActiveSection = () => {
+      if (isManualClick.current) return;
+
+      // Home is active near the top of the page.
+      if (window.scrollY < 80) {
+        setActiveTab("Home");
+        return;
+      }
+
+      // FAQ is active near the bottom of the document.
+      const scrollBottom = window.innerHeight + window.scrollY;
+      const documentHeight = document.documentElement.scrollHeight;
+
+      if (scrollBottom >= documentHeight - 60) {
+        setActiveTab("FAQ");
+        return;
+      }
+
+      // Reference line below the sticky header.
+      const targetY = 120;
+
+      for (const id of sectionIds) {
+        const element = document.getElementById(id);
+
+        if (!element) continue;
+
+        const rect = element.getBoundingClientRect();
+
+        if (rect.top <= targetY && rect.bottom > targetY) {
+          const match = NAV_LINKS.find((link) => link.id === id);
+
+          if (match) {
+            setActiveTab(match.name);
+            return;
+          }
+        }
+      }
+
+      // Fallback: select the intersecting section
+      // with the largest intersection ratio.
+      let bestId: string | null = null;
+      let maxRatio = -1;
+
+      entryMap.forEach((entry, id) => {
+        if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
+          maxRatio = entry.intersectionRatio;
+          bestId = id;
+        }
+      });
+
+      if (bestId) {
+        const match = NAV_LINKS.find((link) => link.id === bestId);
+
+        if (match) {
+          setActiveTab(match.name);
+        }
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          entryMap.set(entry.target.id, entry);
+        });
+
+        updateActiveSection();
+      },
+      {
+        root: null,
+        rootMargin: "-64px 0px -40% 0px",
+        threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+      }
+    );
+
+    elements.forEach((element) => observer.observe(element));
+
+    // Handle browser hash changes.
+    const handleHashChange = () => {
+      const currentHash = window.location.hash;
+
+      const match = NAV_LINKS.find(
+        (link) => link.href === currentHash
+      );
+
+      if (match) {
+        setActiveTab(match.name);
+      }
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      window.cancelAnimationFrame(initialHashFrame);
+
+      observer.disconnect();
+
+      window.removeEventListener("hashchange", handleHashChange);
+
+      if (clickTimeout.current) {
+        clearTimeout(clickTimeout.current);
+        clickTimeout.current = null;
+      }
+    };
+  }, []);
+
+  // -------------------------------------------------------------
+  // Navigation Click
+  // -------------------------------------------------------------
+
+  function handleNavClick(
+    event: MouseEvent<HTMLAnchorElement>,
+    tab: (typeof NAV_LINKS)[number]
+  ) {
+    event.preventDefault();
+
+    setActiveTab(tab.name);
+
+    isManualClick.current = true;
+
+    if (clickTimeout.current) {
+      clearTimeout(clickTimeout.current);
+    }
+
+    clickTimeout.current = setTimeout(() => {
+      isManualClick.current = false;
+      clickTimeout.current = null;
+    }, 850);
+
+    const targetElement = document.querySelector(tab.href);
+
+    if (targetElement) {
+      targetElement.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      window.history.pushState(null, "", tab.href);
     }
   }
 
+  // -------------------------------------------------------------
+  // Header UI
+  // -------------------------------------------------------------
+
   return (
-    <header className="sticky top-0 z-40 w-full select-none shadow-xs">
-      {/* ─────────────────────────────────────────────────────────────
-          Top Navigation Bar (Styled with Hero Section Color Palette)
-          ───────────────────────────────────────────────────────────── */}
-      <div className="border-b border-indigo-100/90 bg-[#f4f5fd]/95 shadow-2xs backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-1.5 sm:px-6 lg:px-8">
-          {/* Brand Logo & Platform Title */}
-          <Link href="/" className="group flex items-center gap-2 shrink-0 pr-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs transition group-hover:bg-indigo-700">
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+    <header className="sticky top-0 z-40 w-full select-none border-b border-slate-200/80 bg-white/95 shadow-xs backdrop-blur-md transition-colors duration-200">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+
+        {/* Brand Logo & Platform Title */}
+        <Link
+          href="/"
+          className="group flex shrink-0 select-none items-center gap-3 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#245B85]"
+        >
+          <div className="relative flex items-center justify-center overflow-hidden rounded-md bg-white">
+            <Image
+              src="/logo.jfif"
+              alt="VI-Fleet Logo"
+              width={46}
+              height={30}
+              className="h-8 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
+              priority
+            />
+          </div>
+
+          <span className="select-none text-xl font-black tracking-tight text-[#142B45]">
+            VI-Fleet
+          </span>
+        </Link>
+
+        {/* Desktop Primary Navigation */}
+        <nav
+          className="hidden select-none items-center space-x-1 md:flex lg:space-x-2"
+          aria-label="Main Navigation"
+        >
+          {NAV_LINKS.map((tab) => {
+            const isActive = activeTab === tab.name;
+
+            return (
+              <a
+                key={tab.name}
+                href={tab.href}
+                onClick={(event) => handleNavClick(event, tab)}
+                aria-current={isActive ? "location" : undefined}
+                className={`relative cursor-pointer select-none rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${
+                  isActive
+                    ? "text-[#142B45]"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-[#142B45]"
+                }`}
               >
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-              </svg>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900">
-                VI-Fleet
-              </span>
-            </div>
+                <span className="select-none">{tab.name}</span>
+
+                {isActive && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute bottom-0.5 left-3 right-3 h-[2.5px] rounded-full bg-[#E6A23C]"
+                  />
+                )}
+              </a>
+            );
+          })}
+        </nav>
+
+        {/* Desktop Actions */}
+        <div className="hidden select-none items-center gap-2.5 sm:flex">
+          <button
+            type="button"
+            onClick={openLogin}
+            className="inline-flex cursor-pointer select-none items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-[#142B45] transition-colors hover:bg-slate-50 hover:text-[#245B85]"
+          >
+            Sign In
+          </button>
+
+          <Link
+            href="/register"
+            className="inline-flex select-none items-center justify-center gap-1.5 rounded-lg bg-[#E6A23C] px-4 py-2 text-sm font-bold text-white shadow-xs transition-all hover:bg-[#d9942d] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E6A23C] focus-visible:ring-offset-2"
+          >
+            <span className="select-none">Get Started</span>
+            <span aria-hidden="true">→</span>
           </Link>
 
-          {/* Desktop Primary Tabs */}
-          <nav className="hidden items-center md:flex self-stretch">
-            {primaryTabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <a
-                  key={tab.id}
-                  href={tab.href}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex items-center px-3.5 py-2 text-[11px] font-bold tracking-wider transition ${
-                    isActive
-                      ? "bg-gradient-to-b from-indigo-600 to-indigo-700 text-white shadow-xs"
-                      : "text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/60"
-                  }`}
-                >
-                  <span>{tab.name}</span>
-                  {/* Subtle vertical separator between non-active tabs */}
-                  {!isActive && (
-                    <span className="absolute right-0 top-1/2 h-3.5 w-px -translate-y-1/2 bg-indigo-100" />
-                  )}
-                </a>
-              );
-            })}
-          </nav>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
 
-          {/* Right Section: Search Bar & Actions */}
-          <div className="flex items-center gap-2.5">
-            {/* Integrated Search Input with Hero-Styled Indigo Button */}
-            <form onSubmit={handleSearchSubmit} className="relative hidden sm:block">
-              <div className="relative flex items-center">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="TYPE YOUR SEARCH HERE"
-                  aria-label="Search website"
-                  className="w-48 lg:w-56 rounded-full border border-indigo-200/80 bg-white py-1 pl-3.5 pr-8 text-[10px] font-medium tracking-wide text-slate-800 placeholder:text-slate-400 placeholder:text-[9.5px] focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-2xs"
+        {/* Mobile Controls */}
+        <div className="flex select-none items-center gap-1.5 sm:hidden">
+          <ThemeToggle
+            theme={theme}
+            onToggle={toggleTheme}
+            mobile
+          />
+
+          <button
+            type="button"
+            onClick={openLogin}
+            className="select-none rounded-md px-2.5 py-1.5 text-xs font-semibold text-[#142B45] hover:bg-slate-100"
+          >
+            Sign In
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((previous) => !previous)}
+            className="inline-flex select-none items-center justify-center rounded-lg p-2 text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#245B85]"
+            aria-expanded={mobileMenuOpen}
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? (
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
                 />
-                <button
-                  type="submit"
-                  aria-label="Execute search"
-                  className="absolute right-0.5 flex h-5.5 w-5.5 items-center justify-center rounded-full bg-gradient-to-b from-indigo-600 to-indigo-700 text-white shadow-xs transition hover:from-indigo-500 hover:to-indigo-600 active:scale-95 cursor-pointer"
-                >
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
-              </div>
-            </form>
-
-            {/* Quick Sign In button (opens login popup) */}
-            <button
-              type="button"
-              onClick={openLogin}
-              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer"
-            >
-              <svg className="h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
               </svg>
-              <span>SIGN IN</span>
-            </button>
-
-            {/* Get Started Button */}
-            <Link
-              href="/register"
-              className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1 text-[11px] font-bold text-white shadow-xs shadow-indigo-600/20 transition hover:bg-indigo-700 active:scale-95"
-            >
-              <span>REGISTER</span>
-              <span aria-hidden="true">→</span>
-            </Link>
-
-            {/* Mobile Hamburger Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="inline-flex items-center justify-center rounded-md border border-indigo-200/80 p-1 text-slate-700 hover:bg-indigo-50 md:hidden"
-              aria-expanded={mobileMenuOpen}
-              aria-label="Toggle navigation menu"
-            >
-              {mobileMenuOpen ? (
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              ) : (
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              )}
-            </button>
-          </div>
+            ) : (
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          MOBILE EXPANDED DRAWER
-          ───────────────────────────────────────────────────────────── */}
+      {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="border-b-2 border-indigo-600 bg-white shadow-xl md:hidden">
-          {/* Mobile Search */}
-          <div className="border-b border-indigo-50 p-3 bg-[#f8f9fe]">
-            <form onSubmit={handleSearchSubmit} className="relative flex items-center">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="TYPE YOUR SEARCH HERE"
-                className="w-full rounded-full border border-indigo-200 bg-white py-1.5 pl-3.5 pr-8 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              <button
-                type="submit"
-                className="absolute right-1 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white"
+        <div className="animate-in slide-in-from-top-2 select-none border-b border-slate-200 bg-white px-4 pb-5 pt-2 shadow-lg sm:hidden">
+          <nav
+            className="flex select-none flex-col space-y-1"
+            aria-label="Mobile Navigation"
+          >
+            {NAV_LINKS.map((tab) => (
+              <a
+                key={tab.name}
+                href={tab.href}
+                onClick={(event) => {
+                  handleNavClick(event, tab);
+                  setMobileMenuOpen(false);
+                }}
+                aria-current={
+                  activeTab === tab.name ? "location" : undefined
+                }
+                className={`flex select-none items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold ${
+                  activeTab === tab.name
+                    ? "bg-slate-100 font-bold text-[#142B45]"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-[#142B45]"
+                }`}
               >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-            </form>
-          </div>
+                <span className="select-none">{tab.name}</span>
 
-          {/* Primary Tabs */}
-          <div className="px-3 py-2">
-            <p className="px-2 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              Main Menu
-            </p>
-            <nav className="flex flex-col gap-0.5">
-              {primaryTabs.map((tab) => (
-                <a
-                  key={tab.id}
-                  href={tab.href}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center justify-between rounded-md px-3 py-1.5 text-xs font-bold ${
-                    activeTab === tab.id
-                      ? "bg-indigo-600 text-white"
-                      : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
-                  }`}
-                >
-                  <span>{tab.name}</span>
-                  <span className="text-[10px] opacity-70">→</span>
-                </a>
-              ))}
-            </nav>
-          </div>
+                {activeTab === tab.name && (
+                  <span
+                    aria-hidden="true"
+                    className="h-1.5 w-1.5 rounded-full bg-[#E6A23C]"
+                  />
+                )}
+              </a>
+            ))}
+          </nav>
 
-          {/* Mobile Footer Actions */}
-          <div className="flex items-center justify-between border-t border-slate-100 p-3 bg-[#f8f9fe]">
+          <div className="mt-4 flex select-none flex-col gap-2.5 border-t border-slate-100 pt-4">
             <button
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
                 openLogin();
               }}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-indigo-50"
+              className="flex w-full select-none items-center justify-center rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-[#142B45] hover:bg-slate-50"
             >
-              <svg className="h-3.5 w-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-              </svg>
-              <span>SIGN IN</span>
+              Sign In
             </button>
 
             <Link
               href="/register"
               onClick={() => setMobileMenuOpen(false)}
-              className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700"
+              className="flex w-full select-none items-center justify-center gap-1.5 rounded-lg bg-[#E6A23C] py-2.5 text-sm font-bold text-white shadow-xs hover:bg-[#d9942d]"
             >
-              REGISTER NOW
+              <span className="select-none">Get Started</span>
+              <span aria-hidden="true">→</span>
             </Link>
           </div>
         </div>

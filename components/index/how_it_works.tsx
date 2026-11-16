@@ -1,111 +1,108 @@
-export default function HowItWorks() {
-  const steps = [
-    {
-      step: "01",
-      title: "Register & Onboard Fleet",
-      badge: "Setup",
-      desc: "Create your organization workspace, import company vehicles with license and spec details, and invite drivers and managers with role-based access.",
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      ),
-    },
-    {
-      step: "02",
-      title: "Submit Trip Requests",
-      badge: "Requisition",
-      desc: "Department staff submit transport requests online with departure times, passenger count, and destinations—replacing slow paper sign-off sheets.",
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
-    },
-    {
-      step: "03",
-      title: "Review & Dispatch",
-      badge: "Operations",
-      desc: "Transport managers approve pending requisitions, match available vehicles with certified drivers, and dispatch with instant schedule updates.",
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-    },
-    {
-      step: "04",
-      title: "Log Fuel & Maintain",
-      badge: "Intelligence",
-      desc: "Drivers record odometer and fuel chits upon arrival. The system calculates km/L efficiency and triggers predictive maintenance alerts.",
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-    },
-  ];
+"use client";
 
+const workflowSteps = [
+  {
+    step: 1,
+    title: "Submit a Request",
+    desc: "Department staff submit transport requisitions online with passenger counts, itineraries, departure times, and cargo needs.",
+    icon: (
+      <svg className="h-6 w-6 text-[#245B85]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+  {
+    step: 2,
+    title: "Plan and Assign",
+    desc: "Transport managers approve pending requisitions, schedule trips, and assign certified drivers and appropriate vehicles with zero conflicts.",
+    icon: (
+      <svg className="h-6 w-6 text-[#245B85]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    step: 3,
+    title: "Track and Complete",
+    desc: "Monitor live trip progress, record completion checkpoints, log odometer readings, and reconcile fuel records seamlessly.",
+    icon: (
+      <svg className="h-6 w-6 text-[#245B85]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+];
+
+export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="border-t border-slate-200/80 bg-white py-14 sm:py-20">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section id="how-it-works" className="scroll-mt-20 relative bg-[#142B45] py-20 sm:py-28 overflow-hidden text-white border-b border-slate-800">
+      {/* Subtle road background curves */}
+      <div className="pointer-events-none absolute inset-0 opacity-10">
+        <svg className="h-full w-full" viewBox="0 0 1200 600" fill="none" preserveAspectRatio="none">
+          <path d="M0 300 Q 300 150, 600 300 T 1200 300" stroke="#E6A23C" strokeWidth="3" strokeDasharray="10 10" />
+          <path d="M0 340 Q 300 190, 600 340 T 1200 340" stroke="white" strokeWidth="1.5" />
+        </svg>
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="mx-auto max-w-3xl text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700 border border-blue-200/60">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
-            Workflow
+        <div className="text-center max-w-4xl mx-auto">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1 text-xs font-bold uppercase tracking-widest text-[#E6A23C] border border-white/15 backdrop-blur-xs">
+            HOW VI-FLEET WORKS
           </span>
-          <h2 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            How VI-Fleet streamlines your operations
+          <h2 className="mt-4 text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">
+            From Request to Delivery — Seamlessly
           </h2>
-          <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-600">
-            Four straightforward steps that turn complex logistics into an automated, error-free workflow.
+          <p className="mt-3.5 text-base sm:text-lg text-slate-300 leading-relaxed font-normal">
+            A cohesive three-step operating workflow designed to replace fragmented logs with automated logistics excellence.
           </p>
         </div>
 
-        {/* Steps Grid */}
-        <div className="relative mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {steps.map((item, index) => (
-            <div
-              key={item.step}
-              className="relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-blue-300 hover:shadow-md"
-            >
-              <div>
-                {/* Step Top Bar */}
-                <div className="flex items-center justify-between">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs">
-                    {item.icon}
-                  </div>
-                  <span className="font-mono text-xs font-bold text-slate-400">
-                    STEP {item.step}
-                  </span>
-                </div>
+        {/* 3 Connected Steps Grid */}
+        <div className="mt-16 grid grid-cols-1 gap-8 md:grid-cols-3 relative">
+          {workflowSteps.map((step, idx) => (
+            <div key={step.step} className="relative flex flex-col">
+              {/* White Card */}
+              <div className="relative z-10 flex flex-1 flex-col justify-between rounded-2xl bg-white p-8 text-[#142B45] shadow-2xl transition-transform duration-300 hover:-translate-y-1">
+                <div>
+                  {/* Step Header with Amber Badge & Blue Icon */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F4F6F8] border border-slate-200">
+                      {step.icon}
+                    </div>
 
-                <div className="mt-4">
-                  <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
-                    {item.badge}
-                  </span>
-                  <h3 className="mt-2 text-sm font-bold text-slate-900">
-                    {item.title}
+                    {/* Amber Numbered Indicator */}
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E6A23C] text-sm font-black text-[#142B45] shadow-md">
+                      0{step.step}
+                    </div>
+                  </div>
+
+                  <h3 className="mt-6 text-xl font-bold text-[#142B45]">
+                    {step.title}
                   </h3>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                    {item.desc}
+
+                  <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                    {step.desc}
                   </p>
                 </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-100 flex items-center gap-2 text-xs font-bold text-[#245B85]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#E6A23C]" />
+                  <span>Step {step.step} of 3</span>
+                </div>
               </div>
 
-              {/* Progress indicator bottom bar */}
-              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center gap-1.5">
-                <div className="h-1 flex-1 rounded-full bg-slate-100 overflow-hidden">
-                  <div
-                    className="h-full bg-blue-600 rounded-full"
-                    style={{ width: `${(index + 1) * 25}%` }}
-                  />
+              {/* Horizontal Connecting Arrow/Line for Desktop (between cards 1-2 and 2-3) */}
+              {idx < 2 && (
+                <div
+                  aria-hidden="true"
+                  className="hidden md:flex absolute top-1/2 -right-4 z-20 -translate-y-1/2 items-center justify-center h-8 w-8 rounded-full bg-[#E6A23C] text-[#142B45] shadow-md"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
                 </div>
-                <span className="text-[10px] font-semibold text-slate-400">
-                  {index + 1}/4
-                </span>
-              </div>
+              )}
             </div>
           ))}
         </div>

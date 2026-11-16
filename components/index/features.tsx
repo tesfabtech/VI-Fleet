@@ -1,52 +1,78 @@
-const features = [
+"use client";
+
+const coreFeatures = [
   {
     number: "01",
+    category: "FLEET ASSETS",
     title: "Vehicle Management",
-    iconBg: "bg-blue-600 text-white",
-    description:
-      "Maintain detailed vehicle profiles, license documentation, odometer readings, and assignment availability in one centralized database.",
+    desc: "Maintain complete asset profiles, license documentation, odometer histories, and real-time assignment availability in a single secure registry.",
+    highlight: "Full Lifecycle Visibility",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true">
-        <path d="M3 13l2-6h14l2 6v6h-2v-2H5v2H3v-6z" />
-        <path d="M5 13h14M7 17h.01M17 17h.01" />
+      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
       </svg>
     ),
   },
   {
     number: "02",
+    category: "PERSONNEL",
     title: "Driver Management",
-    iconBg: "bg-purple-600 text-white",
-    description:
-      "Keep track of driver profiles, licenses, assigned vehicles, contact details, and performance records with full regulatory compliance.",
+    desc: "Track certified driver profiles, commercial license categories, assigned vehicles, contact details, and duty availability with automated compliance.",
+    highlight: "Driver Accountability",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true">
-        <circle cx="9" cy="8" r="3" />
-        <path d="M3 20v-2a6 6 0 0112 0v2M16 5a3 3 0 010 6M18 14a5 5 0 013 4v2" />
+      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     ),
   },
   {
     number: "03",
-    title: "Transportation Requests",
-    iconBg: "bg-emerald-600 text-white",
-    description:
-      "Empower departments to submit trip requests with approvals, route tracking, passenger capacity checks, and automated driver dispatch.",
+    category: "OPERATIONS",
+    title: "Trip Scheduling",
+    desc: "Plan and coordinate transport schedules, passenger manifests, departure timetables, and multi-point stops without double-booking or confusion.",
+    highlight: "Automated Coordination",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true">
-        <path d="M12 21s7-6.2 7-12a7 7 0 10-14 0c0 5.8 7 12 7 12z" />
-        <circle cx="12" cy="9" r="2.5" />
+      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     ),
   },
   {
     number: "04",
-    title: "Maintenance & Fuel",
-    iconBg: "bg-amber-600 text-white",
-    description:
-      "Log scheduled services, prevent unexpected breakdowns, and log fuel receipts to monitor cost per kilometer and fleet uptime.",
+    category: "TELEMATICS",
+    title: "Live Vehicle Tracking",
+    desc: "Gain real-time visibility into active trips, route milestones, checkpoint timestamps, and return confirmations for uninterrupted operational awareness.",
+    highlight: "Real-Time Telematics",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true">
-        <path d="M14 6l4-4 4 4-4 4M18 6l-8 8M5 4l5 5-6 6-3-3zM3 15l6 6" />
+      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+  {
+    number: "05",
+    category: "PREVENTIVE CARE",
+    title: "Maintenance Management",
+    desc: "Log servicing events, configure odometer-based maintenance thresholds, track workshop repairs, and prevent costly roadside breakdowns.",
+    highlight: "Preventive Care",
+    icon: (
+      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+  {
+    number: "06",
+    category: "REQUISITIONS",
+    title: "Transportation Request Management",
+    desc: "Empower departmental staff to submit trip requests digitally with approval workflows, vehicle matching, passenger limits, and instant status updates.",
+    highlight: "Paperless Approvals",
+    icon: (
+      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
   },
@@ -54,44 +80,60 @@ const features = [
 
 export default function Features() {
   return (
-    <section id="features" className="border-y border-slate-200/80 bg-slate-50/70 py-14 sm:py-20">
+    <section id="features" className="scroll-mt-20 bg-white py-16 sm:py-24 border-b border-slate-200/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="mx-auto max-w-3xl text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700 border border-blue-200/60">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
-            Operations Engine
+        <div className="mx-auto max-w-4xl text-center">
+          <span className="inline-flex items-center gap-2 rounded-full bg-[#F4F6F8] px-3.5 py-1 text-xs font-bold uppercase tracking-widest text-[#245B85] border border-slate-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#E6A23C]" />
+            Core Enterprise Features
           </span>
-          <h2 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            Everything your organization needs to run fleet logistics.
+          <h2 className="mt-4 text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-[#142B45]">
+            Built for Modern Transportation Fleets
           </h2>
+          <p className="mt-3.5 text-base sm:text-lg leading-relaxed text-slate-600">
+            Engineered to streamline end-to-end transport operations, eliminate administrative friction,
+            and ensure total operational transparency.
+          </p>
         </div>
 
         {/* Feature Cards Grid */}
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {features.map((feature) => (
+        <div className="mt-14 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          {coreFeatures.map((item) => (
             <article
-              key={feature.number}
-              className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-slate-300 hover:shadow-sm"
+              key={item.number}
+              className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-[#F4F6F8]/60 p-7 transition-all duration-300 hover:border-[#245B85]/50 hover:bg-white hover:shadow-xl hover:-translate-y-1"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg shadow-xs ${feature.iconBg}`}>
-                    {feature.icon}
+                  {/* Blue Icon Container */}
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#245B85] shadow-md shadow-[#245B85]/20 group-hover:scale-105 transition-transform">
+                    {item.icon}
                   </div>
-                  <span className="font-mono text-sm font-semibold text-slate-400">
-                    {feature.number}
+                  <span className="font-mono text-sm font-bold text-slate-400">
+                    {item.number}
                   </span>
                 </div>
 
-                <div className="mt-4">
-                  <h3 className="text-base font-semibold text-slate-900">
-                    {feature.title}
+                <div className="mt-6">
+                  {/* Small Amber Category Label */}
+                  <span className="inline-block text-[11px] font-bold text-[#E6A23C] uppercase tracking-wider">
+                    {item.category}
+                  </span>
+                  {/* Navy Heading */}
+                  <h3 className="mt-1 text-xl font-bold text-[#142B45] group-hover:text-[#245B85] transition-colors">
+                    {item.title}
                   </h3>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                    {feature.description}
+                  {/* Clear Description */}
+                  <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                    {item.desc}
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-[#245B85]">
+                <span>{item.highlight}</span>
+                <span className="transition-transform group-hover:translate-x-1">→</span>
               </div>
             </article>
           ))}
