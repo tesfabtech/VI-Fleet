@@ -544,6 +544,14 @@ export async function updateTripLifecycleStatus(
         };
       }
 
+      // Issue #10 Invariant: Only the assigned driver can start a trip
+      if (targetStatus === "IN_PROGRESS" && !isAssignedDriver) {
+        return {
+          ok: false as const,
+          error: "Only the assigned driver can start a scheduled trip. Managers cannot start trips on behalf of drivers.",
+        };
+      }
+
       if (!canTransitionTripStatus(trip.status, targetStatus)) {
         return {
           ok: false as const,

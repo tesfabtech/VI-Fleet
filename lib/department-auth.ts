@@ -224,25 +224,4 @@ export function decodeSpecialRequirements(
   };
 }
 
-export const formatAddisDateTime = (date: Date) =>
-  new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Addis_Ababa",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-
-export const toAddisDateTimeLocalValue = (date: Date) =>
-  new Date(date.getTime() + 3 * 3600_000).toISOString().slice(0, 16);
-
-export function formatWaitingDuration(createdAt: Date, now = new Date()): string {
-  const diffMs = Math.max(0, now.getTime() - createdAt.getTime());
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ${hours % 24}h`;
-}
+export { formatAddisDateTime, toAddisDateTimeLocalValue, formatWaitingDuration } from "./date-format";

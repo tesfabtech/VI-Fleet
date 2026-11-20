@@ -20,6 +20,15 @@ import {
   ScheduleOrReassignTripForm,
   TripLifecycleControls,
 } from "../trip-forms";
+import {
+  ManagerInterruptionReviewControl,
+  ManagerCompletionReviewControl,
+} from "@/components/transport/report-review-controls";
+import {
+  serializeCompletionReportForReview,
+  decimalToNumber,
+} from "@/lib/driver-trip/serializer";
+import { PhotoEvidenceViewer } from "@/components/driver/photo-evidence-viewer";
 
 const ALLOWED_ROLES = [
   "SYSTEM_ADMINISTRATOR",
@@ -81,6 +90,46 @@ export default async function TransportTripDetailPage({
               model: true,
               vehicleType: true,
             },
+          },
+        },
+      },
+      statusHistory: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          changedBy: {
+            select: { firstName: true, lastName: true, role: true },
+          },
+        },
+      },
+      interruptionReports: {
+        orderBy: [{ status: "asc" }, { reportedAt: "desc" }],
+        include: {
+          reportedByDriver: {
+            select: { firstName: true, lastName: true, phone: true },
+          },
+          reviewedBy: {
+            select: { firstName: true, lastName: true },
+          },
+        },
+      },
+      completionReport: {
+        include: {
+          submittedByDriver: {
+            select: { firstName: true, lastName: true },
+          },
+          reviewedBy: {
+            select: { firstName: true, lastName: true },
+          },
+          revisions: {
+            orderBy: { revisionNumber: "asc" },
+          },
+        },
+      },
+      evidence: {
+        orderBy: { uploadedAt: "desc" },
+        include: {
+          uploadedBy: {
+            select: { firstName: true, lastName: true },
           },
         },
       },
@@ -271,6 +320,18 @@ export default async function TransportTripDetailPage({
       .sort((a, b) => a.score - b.score);
   }
 
+  // Vehicles and drivers list for interruption reassignment
+  const [fleetVehicles, fleetDrivers] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: { organizationId, status: "ACTIVE", deletedAt: null },
+      select: { id: true, registrationNumber: true, make: true, model: true },
+    }),
+    prisma.driver.findMany({
+      where: { organizationId, status: "ACTIVE", deletedAt: null },
+      select: { id: true, firstName: true, lastName: true },
+    }),
+  ]);
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -370,6 +431,42 @@ export default async function TransportTripDetailPage({
         </div>
       </div>
 
+      {/* Driver Interruption Reports Section */}
+      {trip.interruptionReports.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-900">
+              Trip Interruption & Incident Reports ({trip.interruptionReports.length})
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {trip.interruptionReports.map((report) => (
+              <ManagerInterruptionReviewControl
+                key={report.id}
+                report={report}
+                tripId={trip.id}
+                availableVehicles={fleetVehicles}
+                availableDrivers={fleetDrivers}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Driver Completion Report Section */}
+      {trip.completionReport && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-bold text-slate-900">
+            Driver Completion Report & Sign-off
+          </h2>
+          <ManagerCompletionReviewControl
+            report={serializeCompletionReportForReview(trip.completionReport)}
+            tripId={trip.id}
+          />
+        </section>
+      )}
+
+      {/* Lifecycle Controls */}
       <TripLifecycleControls
         tripId={trip.id}
         currentStatus={trip.status}
@@ -382,6 +479,7 @@ export default async function TransportTripDetailPage({
         }
       />
 
+      {/* Reassign Form for Scheduled Trips */}
       {trip.status === "SCHEDULED" && (
         <ScheduleOrReassignTripForm
           mode="reassign"
@@ -396,10 +494,87 @@ export default async function TransportTripDetailPage({
         />
       )}
 
+      {/* Trip Evidence / Photos Section */}
+      {trip.evidence.length > 0 && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
+          <h2 className="text-sm font-bold text-slate-900">
+            Trip Photo Evidence ({trip.evidence.length})
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+            {trip.evidence.map((ev) => (
+              <div
+                key={ev.id}
+                className="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs"
+              >
+                <div>
+                  <span className="font-bold text-slate-900 block">
+                    {ev.evidenceType.replace(/_/g, " ")}
+                  </span>
+                  {ev.odometerReading && (
+                    <span className="text-[11px] text-blue-700 font-semibold block">
+                      Reading: {Number(ev.odometerReading)} km
+                    </span>
+                  )}
+                  <span className="text-[10px] text-slate-500 block mt-1">
+                    Uploaded by {ev.uploadedBy.firstName} {ev.uploadedBy.lastName} •{" "}
+                    {formatAddisDateTime(ev.uploadedAt)}
+                  </span>
+                </div>
+                <PhotoEvidenceViewer
+                  tripId={trip.id}
+                  evidenceId={ev.id}
+                  evidenceType={ev.evidenceType}
+                  odometerReading={decimalToNumber(ev.odometerReading)}
+                  uploadedAt={ev.uploadedAt}
+                  uploadedByName={`${ev.uploadedBy.firstName} ${ev.uploadedBy.lastName}`}
+                  buttonLabel="View Evidence Photo ↗"
+                  className="mt-3 text-center rounded-lg bg-white border border-slate-300 py-1.5 text-xs font-semibold text-blue-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Structured Status History Audit Trail */}
+      {trip.statusHistory.length > 0 && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <h2 className="text-sm font-bold text-slate-900">
+            Trip Status History Audit Trail ({trip.statusHistory.length})
+          </h2>
+          <div className="mt-3 space-y-2">
+            {trip.statusHistory.map((h) => (
+              <div
+                key={h.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-xs"
+              >
+                <div>
+                  <span className="font-bold text-slate-900">
+                    {h.previousStatus ? `${h.previousStatus} → ` : ""}
+                    {h.newStatus}
+                  </span>{" "}
+                  by{" "}
+                  <span className="font-semibold text-blue-700">
+                    {h.changedBy.firstName} {h.changedBy.lastName} ({h.changedBy.role})
+                  </span>
+                  {h.reason && (
+                    <p className="mt-0.5 text-slate-600">{h.reason}</p>
+                  )}
+                </div>
+                <span className="shrink-0 text-[11px] text-slate-500">
+                  {formatAddisDateTime(h.createdAt)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Legacy Assignment Audit Log */}
       {history.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
           <h2 className="text-sm font-bold text-slate-900">
-            Trip Assignment & Execution Audit Log
+            Legacy Dispatch Notes & History
           </h2>
           <div className="mt-3 space-y-2">
             {history.map((h, i) => (

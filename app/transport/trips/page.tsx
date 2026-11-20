@@ -8,6 +8,11 @@ import {
   formatAddisDateTime,
 } from "@/lib/department-auth";
 import { TransportCannotFulfilButton } from "@/app/organization/requests/review-actions";
+import {
+  ManagerInterruptionReviewControl,
+  ManagerCompletionReviewControl,
+} from "@/components/transport/report-review-controls";
+import { serializeCompletionReportForReview } from "@/lib/driver-trip/serializer";
 
 const ALLOWED_ROLES = [
   "SYSTEM_ADMINISTRATOR",
@@ -46,7 +51,15 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
   if (!organizationId) notFound();
 
   const params = await searchParams;
-  const activeTab = params.tab === "trips" ? "trips" : "queue";
+  const activeTab =
+    params.tab === "trips"
+      ? "trips"
+      : params.tab === "interruptions"
+        ? "interruptions"
+        : params.tab === "completions"
+          ? "completions"
+          : "queue";
+
   const statusFilter = TRIP_STATUSES.includes(params.status as TripStatus)
     ? (params.status as TripStatus)
     : undefined;
@@ -115,6 +128,10 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
     scheduledCount,
     inProgressCount,
     completedCount,
+    pendingInterruptionsCount,
+    pendingCompletionsCount,
+    interruptionReportsCount,
+    completionReportsCount,
   ] = await Promise.all([
     prisma.transportationRequest.findMany({
       where: queueWhere,
@@ -166,20 +183,138 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
     prisma.trip.count({
       where: { organizationId, status: "COMPLETED", deletedAt: null },
     }),
+    prisma.tripInterruptionReport.count({
+      where: { organizationId, status: "PENDING_REVIEW" },
+    }),
+    prisma.tripCompletionReport.count({
+      where: { organizationId, reviewStatus: "PENDING_REVIEW" },
+    }),
+    prisma.tripInterruptionReport.count({
+      where: { organizationId },
+    }),
+    prisma.tripCompletionReport.count({
+      where: { organizationId },
+    }),
   ]);
+
+  // Load interruption reports or completion reports only when their tab is active
+  const [interruptionReports, completionReports, activeVehicles, activeDrivers] =
+    await Promise.all([
+      activeTab === "interruptions"
+        ? prisma.tripInterruptionReport.findMany({
+            where: {
+              organizationId,
+              ...(query
+                ? {
+                    OR: [
+                      { description: { contains: query, mode: "insensitive" } },
+                      {
+                        trip: {
+                          transportationRequest: {
+                            purpose: { contains: query, mode: "insensitive" },
+                          },
+                        },
+                      },
+                    ],
+                  }
+                : {}),
+            },
+            orderBy: [{ status: "asc" }, { reportedAt: "desc" }],
+            take: 40,
+            include: {
+              reportedByDriver: {
+                select: { firstName: true, lastName: true, phone: true },
+              },
+              reviewedBy: {
+                select: { firstName: true, lastName: true },
+              },
+              trip: {
+                select: {
+                  id: true,
+                  status: true,
+                  vehicle: {
+                    select: { registrationNumber: true, make: true, model: true },
+                  },
+                  transportationRequest: {
+                    select: { purpose: true, origin: true, destination: true },
+                  },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      activeTab === "completions"
+        ? prisma.tripCompletionReport.findMany({
+            where: {
+              organizationId,
+              ...(query
+                ? {
+                    OR: [
+                      { description: { contains: query, mode: "insensitive" } },
+                      {
+                        trip: {
+                          transportationRequest: {
+                            purpose: { contains: query, mode: "insensitive" },
+                          },
+                        },
+                      },
+                    ],
+                  }
+                : {}),
+            },
+            orderBy: [{ reviewStatus: "asc" }, { submittedAt: "desc" }],
+            take: 40,
+            include: {
+              submittedByDriver: {
+                select: { firstName: true, lastName: true },
+              },
+              reviewedBy: {
+                select: { firstName: true, lastName: true },
+              },
+              revisions: {
+                orderBy: { revisionNumber: "asc" },
+              },
+              trip: {
+                select: {
+                  id: true,
+                  status: true,
+                  vehicle: {
+                    select: { registrationNumber: true, make: true, model: true },
+                  },
+                  transportationRequest: {
+                    select: { purpose: true, origin: true, destination: true },
+                  },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      activeTab === "interruptions"
+        ? prisma.vehicle.findMany({
+            where: { organizationId, status: "ACTIVE", deletedAt: null },
+            select: { id: true, registrationNumber: true, make: true, model: true },
+          })
+        : Promise.resolve([]),
+      activeTab === "interruptions"
+        ? prisma.driver.findMany({
+            where: { organizationId, status: "ACTIVE", deletedAt: null },
+            select: { id: true, firstName: true, lastName: true },
+          })
+        : Promise.resolve([]),
+    ]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <p className="text-xs font-semibold tracking-wider text-blue-600 uppercase">
-            Transport Dispatch & Scheduling
+            Transport Dispatch & Fleet Operations
           </p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900">
-            Trip Scheduling & Vehicle Assignment
+            Trip Scheduling & Driver Workflow Review
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            Schedule approved transportation requests, validate vehicle and driver availability, and monitor active trips.
+            Schedule approved requests, monitor active journeys, and review driver interruption & completion reports.
           </p>
         </div>
 
@@ -200,7 +335,7 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
       </div>
 
       {/* KPI Strip */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Link
           href="/transport/trips?tab=queue"
           className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs transition hover:border-amber-300"
@@ -227,7 +362,7 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
             {scheduledCount}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">
-            Assigned and awaiting departure
+            Assigned and awaiting driver departure
           </p>
         </Link>
 
@@ -247,17 +382,54 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
         </Link>
 
         <Link
-          href="/transport/trips?tab=trips&status=COMPLETED"
-          className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs transition hover:border-slate-400"
+          href="/transport/trips?tab=interruptions"
+          className={`rounded-xl border p-4 shadow-2xs transition hover:border-rose-300 ${
+            pendingInterruptionsCount > 0
+              ? "border-rose-200 bg-rose-50/40"
+              : "border-slate-200 bg-white"
+          }`}
         >
-          <p className="text-xs font-semibold text-slate-500 uppercase">
-            Completed Trips
-          </p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">
-            {completedCount}
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500 uppercase">
+              Interruptions
+            </p>
+            {pendingInterruptionsCount > 0 && (
+              <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                {pendingInterruptionsCount} Pending
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-2xl font-bold text-rose-700">
+            {interruptionReportsCount}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">
-            Finished dispatches
+            Driver incident & delay reports
+          </p>
+        </Link>
+
+        <Link
+          href="/transport/trips?tab=completions"
+          className={`rounded-xl border p-4 shadow-2xs transition hover:border-blue-300 ${
+            pendingCompletionsCount > 0
+              ? "border-amber-200 bg-amber-50/40"
+              : "border-slate-200 bg-white"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500 uppercase">
+              Completions
+            </p>
+            {pendingCompletionsCount > 0 && (
+              <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                {pendingCompletionsCount} Pending
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-2xl font-bold text-slate-900">
+            {completionReportsCount}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            Driver trip closeout reports
           </p>
         </Link>
       </div>
@@ -265,26 +437,56 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
       {/* Main Content Card */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
         <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center">
-          <div className="inline-flex rounded-xl bg-slate-100 p-1">
+          <div className="flex flex-wrap gap-1.5 rounded-xl bg-slate-100 p-1">
             <Link
               href="/transport/trips?tab=queue"
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "queue"
                   ? "bg-white text-slate-900 shadow-2xs"
-                  : "text-slate-600"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Approved Requests Ready to Schedule ({readyToSchedule.length})
+              Ready to Schedule ({readyToSchedule.length})
             </Link>
             <Link
               href="/transport/trips?tab=trips"
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "trips"
                   ? "bg-white text-slate-900 shadow-2xs"
-                  : "text-slate-600"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Scheduled & Active Trips ({trips.length})
+            </Link>
+            <Link
+              href="/transport/trips?tab=interruptions"
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                activeTab === "interruptions"
+                  ? "bg-white text-slate-900 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <span>Interruption Reports</span>
+              {pendingInterruptionsCount > 0 && (
+                <span className="rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
+                  {pendingInterruptionsCount}
+                </span>
+              )}
+            </Link>
+            <Link
+              href="/transport/trips?tab=completions"
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                activeTab === "completions"
+                  ? "bg-white text-slate-900 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <span>Completion Reports</span>
+              {pendingCompletionsCount > 0 && (
+                <span className="rounded-full bg-amber-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
+                  {pendingCompletionsCount}
+                </span>
+              )}
             </Link>
           </div>
 
@@ -297,7 +499,7 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
               type="search"
               name="q"
               defaultValue={query}
-              placeholder="Search route, plate, driver, department..."
+              placeholder="Search purpose, plate, driver..."
               className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs text-slate-900 sm:w-64"
             />
             <button
@@ -338,7 +540,7 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
         )}
 
         {/* TAB 1: Approved Requests Ready to Schedule */}
-        {activeTab === "queue" ? (
+        {activeTab === "queue" && (
           readyToSchedule.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
               <p className="text-sm font-semibold text-slate-800">
@@ -455,94 +657,182 @@ export default async function TransportTripsPage({ searchParams }: PageProps) {
               </table>
             </div>
           )
-        ) : /* TAB 2: Scheduled & Active Trips */
-        trips.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-            <p className="text-sm font-semibold text-slate-800">
-              No scheduled trips match the current filter.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-              <thead>
-                <tr className="text-xs font-semibold text-slate-500 uppercase">
-                  <th className="py-3 pr-4">Trip & Department</th>
-                  <th className="px-4 py-3">Assigned Vehicle</th>
-                  <th className="px-4 py-3">Assigned Driver</th>
-                  <th className="px-4 py-3">Scheduled Window (EAT)</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="py-3 pl-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {trips.map((trip) => (
-                  <tr key={trip.id} className="hover:bg-slate-50">
-                    <td className="py-3.5 pr-4">
-                      <Link
-                        href={`/transport/trips/${trip.id}`}
-                        className="font-semibold text-slate-900 hover:text-blue-600"
-                      >
-                        {trip.transportationRequest.purpose}
-                      </Link>
-                      <p className="text-xs text-slate-500">
-                        {trip.transportationRequest.department.name} •{" "}
-                        {trip.transportationRequest.origin} →{" "}
-                        {trip.transportationRequest.destination} (
-                        {trip.transportationRequest.passengerCount} pax)
-                      </p>
-                    </td>
+        )}
 
-                    <td className="px-4 py-3.5 text-xs">
-                      <p className="font-semibold text-slate-900">
-                        {trip.vehicle.registrationNumber}
-                      </p>
-                      <p className="text-slate-500">
-                        {[trip.vehicle.make, trip.vehicle.model]
-                          .filter(Boolean)
-                          .join(" ") || "Fleet Vehicle"}
-                      </p>
-                    </td>
-
-                    <td className="px-4 py-3.5 text-xs">
-                      <p className="font-semibold text-slate-900">
-                        {trip.driver.firstName} {trip.driver.lastName}
-                      </p>
-                      {trip.driver.phone && (
-                        <p className="text-slate-500">{trip.driver.phone}</p>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3.5 text-xs text-slate-700">
-                      <div>{formatAddisDateTime(trip.scheduledStart)}</div>
-                      <div className="text-slate-400">
-                        to {formatAddisDateTime(trip.scheduledEnd)}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${tripStatusBadge[trip.status]}`}
-                      >
-                        {trip.status}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 pl-4 text-right text-xs font-semibold">
-                      <Link
-                        href={`/transport/trips/${trip.id}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {trip.status === "SCHEDULED"
-                          ? "Manage / Reassign"
-                          : "View Details"}
-                      </Link>
-                    </td>
+        {/* TAB 2: Scheduled & Active Trips */}
+        {activeTab === "trips" && (
+          trips.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+              <p className="text-sm font-semibold text-slate-800">
+                No scheduled trips match the current filter.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                <thead>
+                  <tr className="text-xs font-semibold text-slate-500 uppercase">
+                    <th className="py-3 pr-4">Trip & Department</th>
+                    <th className="px-4 py-3">Assigned Vehicle</th>
+                    <th className="px-4 py-3">Assigned Driver</th>
+                    <th className="px-4 py-3">Scheduled Window (EAT)</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="py-3 pl-4 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {trips.map((trip) => (
+                    <tr key={trip.id} className="hover:bg-slate-50">
+                      <td className="py-3.5 pr-4">
+                        <Link
+                          href={`/transport/trips/${trip.id}`}
+                          className="font-semibold text-slate-900 hover:text-blue-600"
+                        >
+                          {trip.transportationRequest.purpose}
+                        </Link>
+                        <p className="text-xs text-slate-500">
+                          {trip.transportationRequest.department.name} •{" "}
+                          {trip.transportationRequest.origin} →{" "}
+                          {trip.transportationRequest.destination} (
+                          {trip.transportationRequest.passengerCount} pax)
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-3.5 text-xs">
+                        <p className="font-semibold text-slate-900">
+                          {trip.vehicle.registrationNumber}
+                        </p>
+                        <p className="text-slate-500">
+                          {[trip.vehicle.make, trip.vehicle.model]
+                            .filter(Boolean)
+                            .join(" ") || "Fleet Vehicle"}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-3.5 text-xs">
+                        <p className="font-semibold text-slate-900">
+                          {trip.driver.firstName} {trip.driver.lastName}
+                        </p>
+                        {trip.driver.phone && (
+                          <p className="text-slate-500">{trip.driver.phone}</p>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3.5 text-xs text-slate-700">
+                        <div>{formatAddisDateTime(trip.scheduledStart)}</div>
+                        <div className="text-slate-400">
+                          to {formatAddisDateTime(trip.scheduledEnd)}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${tripStatusBadge[trip.status]}`}
+                        >
+                          {trip.status}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 pl-4 text-right text-xs font-semibold">
+                        <Link
+                          href={`/transport/trips/${trip.id}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {trip.status === "SCHEDULED"
+                            ? "Manage / Reassign"
+                            : "View Details"}
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+
+        {/* TAB 3: Interruption Reports */}
+        {activeTab === "interruptions" && (
+          interruptionReports.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+              <p className="text-sm font-semibold text-slate-800">
+                No trip interruption reports found.
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                When drivers encounter breakdowns, delays, or route obstacles, their operational reports will appear here for manager review and resolution.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {interruptionReports.map((rep) => (
+                <div key={rep.id} className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-600">
+                    <div>
+                      <Link
+                        href={`/transport/trips/${rep.trip.id}`}
+                        className="font-bold text-blue-700 hover:underline"
+                      >
+                        Trip: {rep.trip.transportationRequest.purpose}
+                      </Link>{" "}
+                      • Vehicle: <strong>{rep.trip.vehicle.registrationNumber}</strong>{" "}
+                      • Route: {rep.trip.transportationRequest.origin} →{" "}
+                      {rep.trip.transportationRequest.destination}
+                    </div>
+                    <span className="text-[11px] text-slate-500">
+                      Trip Status: <strong>{rep.trip.status}</strong>
+                    </span>
+                  </div>
+                  <ManagerInterruptionReviewControl
+                    report={rep}
+                    tripId={rep.trip.id}
+                    availableVehicles={activeVehicles}
+                    availableDrivers={activeDrivers}
+                  />
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* TAB 4: Completion Reports */}
+        {activeTab === "completions" && (
+          completionReports.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+              <p className="text-sm font-semibold text-slate-800">
+                No trip completion reports found.
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                When drivers finish trips and submit closeout reports with odometer readings, their reports will appear here for administrative verification and sign-off.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {completionReports.map((rep) => (
+                <div key={rep.id} className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-600">
+                    <div>
+                      <Link
+                        href={`/transport/trips/${rep.trip.id}`}
+                        className="font-bold text-blue-700 hover:underline"
+                      >
+                        Trip: {rep.trip.transportationRequest.purpose}
+                      </Link>{" "}
+                      • Vehicle: <strong>{rep.trip.vehicle.registrationNumber}</strong>{" "}
+                      • Route: {rep.trip.transportationRequest.origin} →{" "}
+                      {rep.trip.transportationRequest.destination}
+                    </div>
+                    <span className="text-[11px] text-slate-500">
+                      Trip Status: <strong>{rep.trip.status}</strong>
+                    </span>
+                  </div>
+                  <ManagerCompletionReviewControl
+                    report={serializeCompletionReportForReview(rep)}
+                    tripId={rep.trip.id}
+                  />
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>
