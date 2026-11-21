@@ -1,9 +1,10 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 export type DashboardNavItem = {
   label: string;
@@ -11,11 +12,15 @@ export type DashboardNavItem = {
   icon?: ReactNode;
 };
 
-type DashboardSidebarProps = {
+export type DashboardSidebarProps = {
   brand: string;
   userName?: string;
   roleLabel?: string;
   navigation: DashboardNavItem[];
+  homeHref?: string;
+  brandSubtitle?: string;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 };
 
 function getDefaultNavIcon(label: string): ReactNode {
@@ -28,7 +33,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -41,13 +46,68 @@ function getDefaultNavIcon(label: string): ReactNode {
         </svg>
       );
 
+    case "organization applications":
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 shrink-0"
+          aria-hidden="true"
+        >
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+          <polyline points="10 9 9 9 8 9" />
+        </svg>
+      );
+
+    case "organizations":
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 shrink-0"
+          aria-hidden="true"
+        >
+          <path d="M3 21h18M3 7v14M21 7v14M6 7V3h12v4M6 11h2M10 11h2M6 15h2M10 15h2M16 11h2M16 15h2" />
+        </svg>
+      );
+
+    case "user management":
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 shrink-0"
+          aria-hidden="true"
+        >
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 00-3-3.87" />
+          <path d="M16 3.13a4 4 0 010 7.75" />
+        </svg>
+      );
+
     case "departments":
       return (
         <svg
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -63,7 +123,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -80,7 +140,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -97,7 +157,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -108,13 +168,66 @@ function getDefaultNavIcon(label: string): ReactNode {
         </svg>
       );
 
+    case "transport requests":
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 shrink-0"
+          aria-hidden="true"
+        >
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+          <rect x="9" y="3" width="6" height="4" rx="1" />
+          <path d="M9 14l2 2 4-4" />
+        </svg>
+      );
+
+    case "new request":
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 shrink-0"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <line x1="12" y1="8" x2="12" y2="16" />
+          <line x1="8" y1="12" x2="16" y2="12" />
+        </svg>
+      );
+
+    case "recycle bin":
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 shrink-0"
+          aria-hidden="true"
+        >
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+        </svg>
+      );
+
     case "settings":
       return (
         <svg
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -132,7 +245,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -149,7 +262,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -167,7 +280,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -184,7 +297,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -200,7 +313,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -216,7 +329,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -232,7 +345,7 @@ function getDefaultNavIcon(label: string): ReactNode {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="h-5 w-5 shrink-0"
@@ -245,78 +358,172 @@ function getDefaultNavIcon(label: string): ReactNode {
   }
 }
 
+function isRouteActive(pathname: string, href?: string): boolean {
+  if (!href) return false;
+
+  const rootRoutes = [
+    "/organization",
+    "/transport",
+    "/department",
+    "/admin",
+  ];
+
+  if (rootRoutes.includes(href)) {
+    return pathname === href;
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function DashboardSidebar({
   brand,
   userName = "User",
   roleLabel = "Workspace member",
   navigation,
+  homeHref,
+  brandSubtitle,
+  mobileOpen = false,
+  onMobileClose,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
 
-  const rootHref = brand === "Organization" ? "/organization" : "/transport";
+  // Dynamic Home Route Determination
+  const resolvedHomeHref =
+    homeHref ||
+    navigation.find((item) => item.label.toLowerCase() === "overview")?.href ||
+    navigation.find((item) => item.href)?.href ||
+    (brand === "Organization"
+      ? "/organization"
+      : brand === "Department"
+        ? "/department"
+        : brand === "Transport"
+          ? "/transport"
+          : brand === "Administration" || brand === "System Administrator"
+            ? "/admin"
+            : "/");
+
+  // Handle Escape key and body scroll lock for mobile drawer
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onMobileClose?.();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [mobileOpen, onMobileClose]);
+
+  // Close drawer on pathname navigation
+  useEffect(() => {
+    onMobileClose?.();
+  }, [pathname]);
 
   async function handleSignOut() {
     setSigningOut(true);
     await signOut({ redirectTo: "/login" });
   }
 
-  return (
-    <>
-      <aside className="hidden md:flex md:h-full md:w-64 md:shrink-0 md:flex-col md:overflow-hidden border-r border-slate-200 bg-white">
-        {/* Stationary Top Brand Header */}
-        <div className="flex h-20 shrink-0 items-center gap-3 border-b border-slate-200 px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-700 text-base font-bold text-white">
-            V
+  const renderSidebarContent = (isMobile: boolean) => (
+    <div className="flex h-full w-full flex-col">
+      {/* Brand Header */}
+      <div className="flex h-20 shrink-0 items-center justify-between border-b border-slate-200 px-6 dark:border-slate-800">
+        <Link
+          href={resolvedHomeHref}
+          onClick={isMobile ? onMobileClose : undefined}
+          className="group flex items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#245B85]"
+        >
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xs dark:border-slate-700">
+            <Image
+              src="/logo.jfif"
+              alt="VI-Fleet Logo"
+              width={36}
+              height={36}
+              className="h-full w-auto object-contain transition-transform duration-200 group-hover:scale-105"
+              priority
+            />
           </div>
-          <Link
-            href={rootHref}
-            className="text-xl font-bold tracking-tight text-slate-900"
+          <div className="min-w-0">
+            <span className="text-lg font-black tracking-tight text-[#142B45] dark:text-slate-100">
+              VI-<span className="text-[#245B85] dark:text-blue-400">Fleet</span>
+            </span>
+            <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              {brandSubtitle || `${brand} Workspace`}
+            </p>
+          </div>
+        </Link>
+
+        {isMobile && onMobileClose && (
+          <button
+            type="button"
+            onClick={onMobileClose}
+            aria-label="Close navigation menu"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#245B85] dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
           >
-            VI-<span className="text-blue-600">Fleet</span>
-          </Link>
-        </div>
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
+      </div>
 
-        {/* Independently Scrollable Navigation Section */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5">
-          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            {brand} workspace
-          </p>
+      {/* Independently Scrollable Navigation */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5">
+        <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          {brand === "Administration"
+            ? "Platform Administration"
+            : `${brand} Workspace`}
+        </p>
 
-          <nav
-            aria-label={`${brand} workspace navigation`}
-            className="space-y-1"
-          >
-            {navigation.map((item) => {
-              const icon = item.icon ?? getDefaultNavIcon(item.label);
-              const active =
-                item.href !== undefined &&
-                (pathname === item.href ||
-                  (item.href !== "/organization" &&
-                    item.href !== "/transport" &&
-                    pathname.startsWith(`${item.href}/`)));
+        <nav
+          aria-label={`${brand} workspace navigation`}
+          className="space-y-1"
+        >
+          {navigation.map((item) => {
+            const icon = item.icon ?? getDefaultNavIcon(item.label);
+            const active = isRouteActive(pathname, item.href);
 
-              const className = `group flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                active
-                  ? "bg-blue-50 text-blue-700"
-                  : item.href
-                    ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                    : "cursor-not-allowed text-slate-400"
-              }`;
+            const baseClass =
+              "group flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition";
 
-              return item.href ? (
+            if (item.href) {
+              return (
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={className}
+                  onClick={isMobile ? onMobileClose : undefined}
+                  className={`${baseClass} ${
+                    active
+                      ? "bg-blue-50 text-[#245B85] font-semibold dark:bg-blue-950/40 dark:text-blue-300"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
+                  }`}
                   aria-current={active ? "page" : undefined}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span
                       className={`shrink-0 transition ${
                         active
-                          ? "text-blue-600"
-                          : "text-slate-400 group-hover:text-slate-600"
+                          ? "text-[#245B85] dark:text-blue-400"
+                          : "text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300"
                       }`}
                       aria-hidden="true"
                     >
@@ -325,98 +532,96 @@ export default function DashboardSidebar({
                     <span className="truncate">{item.label}</span>
                   </div>
                   {active && (
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" />
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#245B85] dark:bg-blue-400" />
                   )}
                 </Link>
-              ) : (
-                <div
-                  key={item.label}
-                  className={className}
-                  title="This section is not available yet"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className="shrink-0 text-slate-300"
-                      aria-hidden="true"
-                    >
-                      {icon}
-                    </span>
-                    <span className="truncate">{item.label}</span>
-                  </div>
-                  <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-400">
-                    Soon
-                  </span>
-                </div>
               );
-            })}
-          </nav>
-        </div>
+            }
 
-        {/* Stationary Sidebar Bottom Account & Sign-Out Box */}
-        <div className="mt-auto shrink-0 border-t border-slate-200 p-4 space-y-2 bg-white">
-          <div className="rounded-lg bg-slate-50 p-3">
-            <p className="truncate text-xs font-semibold text-slate-900">
+            return (
+              <div
+                key={item.label}
+                className={`${baseClass} cursor-not-allowed text-slate-400 dark:text-slate-500`}
+                title="This section has not been implemented yet"
+                aria-disabled="true"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span
+                    className="shrink-0 text-slate-300 dark:text-slate-600"
+                    aria-hidden="true"
+                  >
+                    {icon}
+                  </span>
+                  <span className="truncate">{item.label}</span>
+                </div>
+                <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                  Soon
+                </span>
+              </div>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Stationary Bottom Profile & Sign-Out */}
+      <div className="mt-auto shrink-0 border-t border-slate-200 p-4 space-y-2 bg-white dark:border-slate-800 dark:bg-[#111827]">
+        <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800/60">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-[#245B85] dark:bg-blue-900/50 dark:text-blue-300">
+            {userName.trim().charAt(0).toUpperCase() || "U"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">
               {userName}
             </p>
-            <p className="truncate text-[11px] text-slate-500">{roleLabel}</p>
+            <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+              {roleLabel}
+            </p>
           </div>
-
-          <button
-            type="button"
-            disabled={signingOut}
-            onClick={handleSignOut}
-            className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-          >
-            <span>{signingOut ? "Signing out..." : "Sign out"}</span>
-            <span aria-hidden="true">↪</span>
-          </button>
         </div>
+
+        <button
+          type="button"
+          disabled={signingOut}
+          onClick={handleSignOut}
+          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"
+        >
+          <span>{signingOut ? "Signing out..." : "Sign out"}</span>
+          <span aria-hidden="true">↪</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Stationary Sidebar */}
+      <aside className="hidden md:flex md:h-full md:w-64 md:shrink-0 md:flex-col md:overflow-hidden border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-[#111827]">
+        {renderSidebarContent(false)}
       </aside>
 
-      {/* Mobile Horizontal Navigation Bar */}
-      <nav
-        aria-label={`${brand} mobile navigation`}
-        className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-3 md:hidden"
+      {/* Mobile Drawer Backdrop */}
+      <div
+        role="presentation"
+        onClick={onMobileClose}
+        className={`fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-xs transition-opacity duration-300 md:hidden ${
+          mobileOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+      />
+
+      {/* Mobile Navigation Drawer */}
+      <aside
+        id="mobile-navigation-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${brand} navigation drawer`}
+        className={`fixed inset-y-0 left-0 z-50 flex h-full w-72 flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out dark:border-slate-800 dark:bg-[#111827] md:hidden ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
-        {navigation.map((item) => {
-          const icon = item.icon ?? getDefaultNavIcon(item.label);
-          const active =
-            item.href !== undefined &&
-            (pathname === item.href ||
-              (item.href !== "/organization" &&
-                item.href !== "/transport" &&
-                pathname.startsWith(`${item.href}/`)));
-
-          const className = `flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
-            active
-              ? "bg-blue-50 text-blue-700"
-              : item.href
-                ? "text-slate-600"
-                : "text-slate-400"
-          }`;
-
-          return item.href ? (
-            <Link key={item.label} href={item.href} className={className}>
-              <span
-                className={`shrink-0 ${
-                  active ? "text-blue-600" : "text-slate-400"
-                }`}
-                aria-hidden="true"
-              >
-                {icon}
-              </span>
-              <span>{item.label}</span>
-            </Link>
-          ) : (
-            <span key={item.label} className={className}>
-              <span className="shrink-0 text-slate-300" aria-hidden="true">
-                {icon}
-              </span>
-              <span>{item.label}</span>
-            </span>
-          );
-        })}
-      </nav>
+        {renderSidebarContent(true)}
+      </aside>
     </>
   );
 }
