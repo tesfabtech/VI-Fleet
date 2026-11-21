@@ -331,6 +331,14 @@ export async function approveOrganizationApplication(
           contactEmail: application.contactEmail,
           phone: application.phone,
           code,
+          organizationType: application.organizationType,
+          website: application.website,
+          country: application.country,
+          region: application.region,
+          city: application.city,
+          streetAddress: application.streetAddress,
+          departmentCount: application.departmentCount,
+          estimatedFleetSize: application.estimatedFleetSize,
         },
       });
 
