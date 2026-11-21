@@ -22,6 +22,7 @@ export default async function DepartmentLayout({
       roleLabel={`${ctx.departmentName} • Department User`}
       userName={ctx.userName}
       navigation={navigation}
+      homeHref="/department"
     >
       {children}
     </ManagementDashboardShell>

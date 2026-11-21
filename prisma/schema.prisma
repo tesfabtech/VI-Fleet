@@ -165,6 +165,13 @@ enum OrganizationApplicationStatus {
   REJECTED
 }
 
+enum OrganizationType {
+  PRIVATE_COMPANY
+  GOVERNMENT
+  NGO
+  OTHER
+}
+
 enum OrganizationPaymentStatus {
   NOT_REQUIRED
   PENDING
@@ -197,6 +204,17 @@ model Organization {
   code         String? @unique @db.VarChar(20)
   contactEmail String? @map("contact_email") @db.VarChar(255)
   phone        String? @db.VarChar(30)
+
+  organizationType   OrganizationType?
+  website            String?            @db.VarChar(255)
+
+  country            String?            @db.VarChar(100)
+  region             String?            @db.VarChar(100)
+  city               String?            @db.VarChar(100)
+  streetAddress      String?            @db.VarChar(255)
+
+  departmentCount    Int?
+  estimatedFleetSize String?             @db.VarChar(50)
 
   departments                 Department[]
   users                       User[]
@@ -236,6 +254,22 @@ model OrganizationApplication {
   contactEmail     String  @map("contact_email") @db.VarChar(255)
   phone            String? @db.VarChar(30)
   description      String?
+
+  organizationType   OrganizationType?
+  website            String?            @db.VarChar(255)
+
+  country            String?            @db.VarChar(100)
+  region             String?            @db.VarChar(100)
+  city               String?            @db.VarChar(100)
+  streetAddress      String?            @db.VarChar(255)
+
+  departmentCount    Int?
+  estimatedFleetSize String?             @db.VarChar(50)
+
+  officialDocumentKey      String? @db.VarChar(500)
+  officialDocumentFileName String? @db.VarChar(255)
+  officialDocumentMimeType String? @db.VarChar(100)
+  officialDocumentSize     Int?
 
   status        OrganizationApplicationStatus @default(PENDING)
   paymentStatus OrganizationPaymentStatus     @default(NOT_REQUIRED) @map("payment_status")

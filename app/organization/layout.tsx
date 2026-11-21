@@ -85,6 +85,7 @@ export default async function OrganizationLayout({
       roleLabel={ROLE_LABELS[currentUser.role as AllowedRole]}
       userName={displayName}
       navigation={navigation}
+      homeHref="/organization"
     >
       {children}
     </ManagementDashboardShell>

@@ -17,5 +17,9 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <AdminShell userName={session.user.name?.trim() || "System Administrator"}>
+      {children}
+    </AdminShell>
+  );
 }
