@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getAuthorizationContext, PERMISSIONS } from "@/lib/rbac";
 import ManagementDashboardShell from "@/components/dashboard/management-dashboard-shell";
 
 const navigation = [
@@ -13,6 +14,7 @@ const navigation = [
     href: "/organization/department-users/registration-links",
   },
   { label: "Transport Managers", href: "/organization/transport-managers" },
+  { label: "Roles & Permissions", href: "/organization/roles" },
   { label: "Fleet" },
   { label: "Reports" },
   { label: "Settings", href: "/organization/settings" },
@@ -79,12 +81,24 @@ export default async function OrganizationLayout({
     session.user.name?.trim() ||
     "Administrator";
 
+  const authContext = await getAuthorizationContext();
+  const canManageRoles =
+    authContext?.hasPermission(PERMISSIONS.ORG_ROLES_MANAGE) ??
+    (currentUser.role === "ORGANIZATION_ADMINISTRATOR");
+
+  const visibleNavigation = navigation.filter((item) => {
+    if (item.href === "/organization/roles") {
+      return canManageRoles;
+    }
+    return true;
+  });
+
   return (
     <ManagementDashboardShell
       brand="Organization"
       roleLabel={ROLE_LABELS[currentUser.role as AllowedRole]}
       userName={displayName}
-      navigation={navigation}
+      navigation={visibleNavigation}
       homeHref="/organization"
     >
       {children}
