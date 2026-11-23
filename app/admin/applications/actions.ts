@@ -7,6 +7,7 @@ import {
   getAppUrl,
   sendAdministratorInvitationEmail,
 } from "@/lib/gmail-email"
+import { createPendingRoleAssignment } from "@/lib/rbac";
 import { createHash, randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
@@ -361,22 +362,11 @@ export async function approveOrganizationApplication(
         },
       });
 
-      const orgAdminRole = await tx.organizationRole.findFirstOrThrow({
-        where: {
-          organizationId: organization.id,
-          slug: "org-admin",
-        },
-        select: { id: true },
-      });
-
-      await tx.userRoleAssignment.create({
-        data: {
-          organizationId: organization.id,
-          userId: user.id,
-          roleId: orgAdminRole.id,
-          departmentId: null,
-          status: "PENDING_VERIFICATION",
-        },
+      await createPendingRoleAssignment(tx, {
+        organizationId: organization.id,
+        userId: user.id,
+        roleSlug: "org-admin",
+        departmentId: null,
       });
 
       await tx.organizationInvitation.create({
@@ -535,6 +525,14 @@ export async function reissueAdministratorInvitation(
           tokenHash,
           expiresAt,
         },
+      });
+
+      await createPendingRoleAssignment(tx, {
+        organizationId: application.organizationId,
+        userId: user.id,
+        roleSlug: "org-admin",
+        departmentId: null,
+        assignedById: administrator.id,
       });
 
       invitationRecipient = application.contactEmail;

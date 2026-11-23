@@ -10,6 +10,7 @@ import {
   sendDepartmentUserInvitationEmail,
 } from "@/lib/gmail-email";
 import { prisma } from "@/lib/prisma";
+import { createPendingRoleAssignment } from "@/lib/rbac";
 
 const DEPARTMENTS_PATH = "/organization/departments";
 
@@ -439,6 +440,14 @@ export async function approveApplicationFromDepartment(formData: FormData) {
             tokenHash,
             expiresAt,
           },
+        });
+
+        await createPendingRoleAssignment(tx, {
+          organizationId: reviewer.organizationId,
+          userId: user.id,
+          roleSlug: "department-user",
+          departmentId: application.departmentId,
+          assignedById: reviewer.userId,
         });
 
         const updated = await tx.departmentUserApplication.updateMany({
