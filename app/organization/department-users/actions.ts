@@ -11,6 +11,7 @@ import {
   sendEmailVerificationEmail,
 } from "@/lib/gmail-email";
 import { prisma } from "@/lib/prisma";
+import { createPendingRoleAssignment } from "@/lib/rbac";
 
 const BASE_PATH = "/organization/department-users";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -119,6 +120,14 @@ export async function approveDepartmentUserApplication(fd: FormData) {
         data: { userId: user.id, createdById: userId, tokenHash: hash(rawToken), expiresAt },
       });
 
+      await createPendingRoleAssignment(tx, {
+        organizationId,
+        userId: user.id,
+        roleSlug: "department-user",
+        departmentId: app.departmentId,
+        assignedById: userId,
+      });
+
       const { count } = await tx.departmentUserApplication.updateMany({
         where: { id: app.id, organizationId, status: { in: ["PENDING", "UNDER_REVIEW"] }, createdUserId: null },
         data: { status: "APPROVED", reviewNotes: reviewNotes || null, reviewedById: userId, reviewedAt: new Date(), createdUserId: user.id },
@@ -207,6 +216,14 @@ export async function createDepartmentUserInvitation(fd: FormData) {
         data: { userId: user.id, createdById: userId, tokenHash: hash(rawToken), expiresAt },
       });
 
+      await createPendingRoleAssignment(tx, {
+        organizationId,
+        userId: user.id,
+        roleSlug: "department-user",
+        departmentId: dept.id,
+        assignedById: userId,
+      });
+
       await sendDepartmentUserInvitationEmail({
         to: email,
         organizationName: orgName,
@@ -245,6 +262,20 @@ export async function updateDepartmentUserAssignment(fd: FormData) {
   });
 
   if (count !== 1) done(path, "error", "user-not-found");
+
+  // Keep active and pending department-user role assignments in sync with the new department
+  await prisma.userRoleAssignment.updateMany({
+    where: {
+      userId,
+      organizationId,
+      role: { slug: "department-user" },
+      status: { in: ["ACTIVE", "PENDING_VERIFICATION"] },
+    },
+    data: {
+      departmentId: dept.id,
+    },
+  });
+
   done(path, "message", "department-updated");
 }
 
@@ -313,6 +344,16 @@ export async function resendDepartmentUserInvitation(fd: FormData) {
       await tx.organizationInvitation.create({
         data: { userId: user.id, createdById: adminId, tokenHash: hash(rawToken), expiresAt: new Date(now.getTime() + 48 * 3600 * 1000) },
       });
+
+      if (user.departmentId) {
+        await createPendingRoleAssignment(tx, {
+          organizationId,
+          userId: user.id,
+          roleSlug: "department-user",
+          departmentId: user.departmentId,
+          assignedById: adminId,
+        });
+      }
 
       await sendDepartmentUserInvitationEmail({
         to,

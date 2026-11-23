@@ -11,6 +11,7 @@ import {
   sendTransportManagerInvitationEmail,
 } from "@/lib/gmail-email";
 import { prisma } from "@/lib/prisma";
+import { createPendingRoleAssignment } from "@/lib/rbac";
 
 const BASE_PATH = "/transport/drivers";
 const UUID_RE =
@@ -418,6 +419,14 @@ export async function resendDriverInvitation(formData: FormData): Promise<void> 
           tokenHash,
           expiresAt,
         },
+      });
+
+      await createPendingRoleAssignment(tx, {
+        organizationId,
+        userId: driver.user!.id,
+        roleSlug: "driver",
+        departmentId: null,
+        assignedById: managerId,
       });
     });
 

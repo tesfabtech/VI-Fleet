@@ -11,6 +11,7 @@ import {
   getAppUrl,
   sendTransportManagerInvitationEmail,
 } from "@/lib/gmail-email";
+import { createPendingRoleAssignment } from "@/lib/rbac";
 
 const pagePath = "/organization/transport-managers";
 
@@ -156,6 +157,19 @@ export async function createTransportManager(formData: FormData) {
   },
 });
 
+        const roleSlug =
+          role === "VICE_TRANSPORT_MANAGER"
+            ? ("vice-transport-manager" as const)
+            : ("transport-manager" as const);
+
+        await createPendingRoleAssignment(tx, {
+          organizationId: session.user.organizationId!,
+          userId: user.id,
+          roleSlug,
+          departmentId: null,
+          assignedById: session.user.id,
+        });
+
         await sendTransportManagerInvitationEmail({
           to: email,
           organizationName: organization.name,
@@ -276,6 +290,19 @@ export async function resendTransportManagerInvitation(
           tokenHash,
           expiresAt,
         },
+      });
+
+      const roleSlug =
+        user.role === "VICE_TRANSPORT_MANAGER"
+          ? ("vice-transport-manager" as const)
+          : ("transport-manager" as const);
+
+      await createPendingRoleAssignment(tx, {
+        organizationId: session.user.organizationId!,
+        userId: user.id,
+        roleSlug,
+        departmentId: null,
+        assignedById: session.user.id,
       });
 
       const roleLabel =

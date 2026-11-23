@@ -7,6 +7,7 @@ import {
   getAppUrl,
   sendTransportManagerInvitationEmail,
 } from "@/lib/gmail-email";
+import { createPendingRoleAssignment } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -221,6 +222,14 @@ export async function createDriver(formData: FormData): Promise<void> {
           tokenHash,
           expiresAt,
         },
+      });
+
+      await createPendingRoleAssignment(tx, {
+        organizationId,
+        userId: user.id,
+        roleSlug: "driver",
+        departmentId: null,
+        assignedById: createdById,
       });
     });
   } catch (error) {
