@@ -210,6 +210,70 @@ enum DepartmentUserApplicationStatus {
   REJECTED
 }
 
+enum WorkflowStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum WorkflowVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum StageApprovalPolicy {
+  ANY_ONE
+  ALL
+}
+
+enum StageApproverType {
+  USER
+  ROLE
+}
+
+enum WorkflowInstanceStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  CANCELLED
+}
+
+enum StageInstanceStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  SKIPPED
+}
+
+enum ApprovalDecisionType {
+  APPROVE
+  REJECT
+  REQUEST_CHANGES
+  SKIP
+}
+
+enum WorkflowEventType {
+  WORKFLOW_CREATED
+  WORKFLOW_UPDATED
+  VERSION_CREATED
+  VERSION_PUBLISHED
+  VERSION_ARCHIVED
+  INSTANCE_STARTED
+  STAGE_ENTERED
+  DECISION_RECORDED
+  STAGE_COMPLETED
+  STAGE_SKIPPED
+  CHANGES_REQUESTED
+  REQUEST_RESUBMITTED
+  INSTANCE_APPROVED
+  INSTANCE_REJECTED
+  INSTANCE_CANCELLED
+}
+
 // ============================================================
 // ORGANIZATION
 // ============================================================
@@ -264,6 +328,15 @@ model Organization {
   tripCompletionReports         TripCompletionReport[]
   tripEvidence                  TripEvidence[]
   tripCompletionReportRevisions TripCompletionReportRevision[]
+
+  approvalWorkflows             ApprovalWorkflow[]
+  approvalWorkflowVersions      ApprovalWorkflowVersion[]
+  approvalWorkflowStages        ApprovalWorkflowStage[]
+  approvalStageApprovers        ApprovalStageApprover[]
+  approvalWorkflowInstances     ApprovalWorkflowInstance[]
+  approvalStageInstances        ApprovalStageInstance[]
+  approvalDecisions             ApprovalDecision[]
+  approvalWorkflowEvents        ApprovalWorkflowEvent[]
 
   application OrganizationApplication?
 
@@ -431,6 +504,7 @@ model Department {
   userRoleAssignments        UserRoleAssignment[]
   transportationRequests     TransportationRequest[]
   departmentUserApplications DepartmentUserApplication[]
+  approvalWorkflowInstances  ApprovalWorkflowInstance[]
 
   @@unique([organizationId, id])
   @@index([organizationId])
@@ -495,6 +569,14 @@ model User {
   reviewedTripCompletions   TripCompletionReport[]   @relation("TripCompletionReviewedBy")
   uploadedTripEvidence      TripEvidence[]           @relation("TripEvidenceUploadedBy")
 
+  createdApprovalWorkflows   ApprovalWorkflow[]        @relation("CreatedApprovalWorkflows")
+  publishedWorkflowVersions  ApprovalWorkflowVersion[] @relation("PublishedWorkflowVersions")
+  stageApproverAssignments   ApprovalStageApprover[]   @relation("StageApproverUser")
+  requestedWorkflowInstances ApprovalWorkflowInstance[] @relation("InstanceRequester")
+  cancelledWorkflowInstances ApprovalWorkflowInstance[] @relation("InstanceCancelledBy")
+  approvalDecisions          ApprovalDecision[]        @relation("ApprovalDecisions")
+  approvalWorkflowEvents     ApprovalWorkflowEvent[]   @relation("WorkflowEventActor")
+
   @@unique([organizationId, id])
   @@index([organizationId])
   @@index([organizationId, role])
@@ -545,6 +627,7 @@ model OrganizationRole {
 
   rolePermissions RolePermission[]
   userAssignments UserRoleAssignment[]
+  stageApproverAssignments ApprovalStageApprover[] @relation("StageApproverRole")
 
   @@unique([organizationId, id])
   @@index([organizationId, slug])
@@ -1332,4 +1415,246 @@ model TripCompletionReportRevision {
   @@unique([organizationId, completionReportId, revisionNumber])
   @@index([organizationId, submittedByDriverId, submittedAt])
   @@map("trip_completion_report_revisions")
+}
+
+// ============================================================
+// APPROVAL_WORKFLOW
+// ============================================================
+
+model ApprovalWorkflow {
+  id               String         @id @default(uuid()) @db.Uuid
+  organizationId   String         @map("organization_id") @db.Uuid
+  name             String         @db.VarChar(150)
+  description      String?
+  workflowType     String         @map("workflow_type") @db.VarChar(100)
+  status           WorkflowStatus @default(ACTIVE)
+  currentVersionId String?        @map("current_version_id") @db.Uuid
+  createdById      String?        @map("created_by_id") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz(6)
+
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy      User?                    @relation("CreatedApprovalWorkflows", fields: [organizationId, createdById], references: [organizationId, id], onDelete: Restrict)
+  versions       ApprovalWorkflowVersion[] @relation("WorkflowVersions")
+  currentVersion ApprovalWorkflowVersion? @relation("CurrentWorkflowVersion", fields: [id, currentVersionId], references: [workflowId, id], onDelete: Restrict)
+  instances      ApprovalWorkflowInstance[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, workflowType])
+  @@index([organizationId, status])
+  @@index([currentVersionId])
+  @@map("approval_workflows")
+}
+
+// ============================================================
+// APPROVAL_WORKFLOW_VERSION
+// ============================================================
+
+model ApprovalWorkflowVersion {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  workflowId     String                @map("workflow_id") @db.Uuid
+  versionNumber  Int                   @map("version_number")
+  status         WorkflowVersionStatus @default(DRAFT)
+  publishedAt    DateTime?             @map("published_at") @db.Timestamptz(6)
+  publishedById  String?               @map("published_by_id") @db.Uuid
+  archivedAt     DateTime?             @map("archived_at") @db.Timestamptz(6)
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization       Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  workflow           ApprovalWorkflow           @relation("WorkflowVersions", fields: [organizationId, workflowId], references: [organizationId, id], onDelete: Cascade)
+  publishedBy        User?                      @relation("PublishedWorkflowVersions", fields: [organizationId, publishedById], references: [organizationId, id], onDelete: Restrict)
+  stages             ApprovalWorkflowStage[]
+  instances          ApprovalWorkflowInstance[]
+  currentInWorkflows ApprovalWorkflow[]         @relation("CurrentWorkflowVersion")
+
+  @@unique([organizationId, id])
+  @@unique([workflowId, id])
+  @@unique([workflowId, versionNumber])
+  @@index([organizationId, status])
+  @@index([workflowId, status])
+  @@map("approval_workflow_versions")
+}
+
+// ============================================================
+// APPROVAL_WORKFLOW_STAGE
+// ============================================================
+
+model ApprovalWorkflowStage {
+  id                     String              @id @default(uuid()) @db.Uuid
+  organizationId         String              @map("organization_id") @db.Uuid
+  versionId              String              @map("version_id") @db.Uuid
+  name                   String              @db.VarChar(150)
+  description            String?
+  stageOrder             Int                 @map("stage_order")
+  isOptional             Boolean             @default(false) @map("is_optional")
+  approvalPolicy         StageApprovalPolicy @default(ANY_ONE) @map("approval_policy")
+  requiredPermissionCode String?             @map("required_permission_code") @db.VarChar(100)
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  version        ApprovalWorkflowVersion @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Cascade)
+  approvers      ApprovalStageApprover[]
+  stageInstances ApprovalStageInstance[]
+
+  @@unique([organizationId, id])
+  @@unique([versionId, stageOrder])
+  @@index([organizationId])
+  @@index([versionId])
+  @@map("approval_workflow_stages")
+}
+
+// ============================================================
+// APPROVAL_STAGE_APPROVER
+// ============================================================
+
+model ApprovalStageApprover {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  stageId        String            @map("stage_id") @db.Uuid
+  approverType   StageApproverType @map("approver_type")
+  userId         String?           @map("user_id") @db.Uuid
+  roleId         String?           @map("role_id") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  stage        ApprovalWorkflowStage @relation(fields: [organizationId, stageId], references: [organizationId, id], onDelete: Cascade)
+  user         User?                 @relation("StageApproverUser", fields: [organizationId, userId], references: [organizationId, id], onDelete: Restrict)
+  role         OrganizationRole?     @relation("StageApproverRole", fields: [organizationId, roleId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@index([stageId])
+  @@index([organizationId, userId])
+  @@index([organizationId, roleId])
+  @@map("approval_stage_approvers")
+}
+
+// ============================================================
+// APPROVAL_WORKFLOW_INSTANCE
+// ============================================================
+
+model ApprovalWorkflowInstance {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  organizationId     String                 @map("organization_id") @db.Uuid
+  workflowId         String                 @map("workflow_id") @db.Uuid
+  workflowVersionId  String                 @map("workflow_version_id") @db.Uuid
+  entityType         String                 @map("entity_type") @db.VarChar(100)
+  entityId           String                 @map("entity_id") @db.VarChar(100)
+  departmentId       String?                @map("department_id") @db.Uuid
+  requesterId        String                 @map("requester_id") @db.Uuid
+  currentStageId     String?                @map("current_stage_id") @db.Uuid
+  status             WorkflowInstanceStatus @default(PENDING)
+  startedAt          DateTime               @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt        DateTime?              @map("completed_at") @db.Timestamptz(6)
+  cancellationReason String?                @map("cancellation_reason")
+  cancelledById      String?                @map("cancelled_by_id") @db.Uuid
+  cancelledAt        DateTime?              @map("cancelled_at") @db.Timestamptz(6)
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  workflow        ApprovalWorkflow        @relation(fields: [organizationId, workflowId], references: [organizationId, id], onDelete: Restrict)
+  workflowVersion ApprovalWorkflowVersion @relation(fields: [workflowId, workflowVersionId], references: [workflowId, id], onDelete: Restrict)
+  department      Department?             @relation(fields: [organizationId, departmentId], references: [organizationId, id], onDelete: Restrict)
+  requester       User                    @relation("InstanceRequester", fields: [organizationId, requesterId], references: [organizationId, id], onDelete: Restrict)
+  cancelledBy     User?                   @relation("InstanceCancelledBy", fields: [organizationId, cancelledById], references: [organizationId, id], onDelete: Restrict)
+  stageInstances  ApprovalStageInstance[]
+  decisions       ApprovalDecision[]
+  events          ApprovalWorkflowEvent[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, status])
+  @@index([organizationId, requesterId])
+  @@index([workflowVersionId])
+  @@map("approval_workflow_instances")
+}
+
+// ============================================================
+// APPROVAL_STAGE_INSTANCE
+// ============================================================
+
+model ApprovalStageInstance {
+  id              String              @id @default(uuid()) @db.Uuid
+  organizationId  String              @map("organization_id") @db.Uuid
+  instanceId      String              @map("instance_id") @db.Uuid
+  stageId         String              @map("stage_id") @db.Uuid
+  stageOrder      Int                 @map("stage_order")
+  iteration       Int                 @default(1)
+  status          StageInstanceStatus @default(PENDING)
+  enteredAt       DateTime            @default(now()) @map("entered_at") @db.Timestamptz(6)
+  completedAt     DateTime?           @map("completed_at") @db.Timestamptz(6)
+  decisionSummary String?             @map("decision_summary")
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  instance     ApprovalWorkflowInstance @relation(fields: [organizationId, instanceId], references: [organizationId, id], onDelete: Cascade)
+  stage        ApprovalWorkflowStage    @relation(fields: [organizationId, stageId], references: [organizationId, id], onDelete: Restrict)
+  decisions    ApprovalDecision[]
+  events       ApprovalWorkflowEvent[]
+
+  @@unique([organizationId, id])
+  @@unique([instanceId, stageId, iteration])
+  @@index([instanceId, status])
+  @@index([organizationId, status])
+  @@map("approval_stage_instances")
+}
+
+// ============================================================
+// APPROVAL_DECISION
+// ============================================================
+
+model ApprovalDecision {
+  id              String               @id @default(uuid()) @db.Uuid
+  organizationId  String               @map("organization_id") @db.Uuid
+  instanceId      String               @map("instance_id") @db.Uuid
+  stageInstanceId String               @map("stage_instance_id") @db.Uuid
+  approverId      String               @map("approver_id") @db.Uuid
+  decisionType    ApprovalDecisionType @map("decision_type")
+  comment         String?
+  decidedAt       DateTime             @default(now()) @map("decided_at") @db.Timestamptz(6)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization  Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  instance      ApprovalWorkflowInstance @relation(fields: [organizationId, instanceId], references: [organizationId, id], onDelete: Cascade)
+  stageInstance ApprovalStageInstance    @relation(fields: [organizationId, stageInstanceId], references: [organizationId, id], onDelete: Cascade)
+  approver      User                     @relation("ApprovalDecisions", fields: [organizationId, approverId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([stageInstanceId, approverId])
+  @@index([organizationId, approverId])
+  @@index([instanceId])
+  @@map("approval_decisions")
+}
+
+// ============================================================
+// APPROVAL_WORKFLOW_EVENT
+// ============================================================
+
+model ApprovalWorkflowEvent {
+  id              String            @id @default(uuid()) @db.Uuid
+  organizationId  String            @map("organization_id") @db.Uuid
+  instanceId      String            @map("instance_id") @db.Uuid
+  stageInstanceId String?           @map("stage_instance_id") @db.Uuid
+  eventType       WorkflowEventType @map("event_type")
+  actorId         String?           @map("actor_id") @db.Uuid
+  fromStatus      String?           @map("from_status")
+  toStatus        String?           @map("to_status")
+  details         Json?             @map("details")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization  Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  instance      ApprovalWorkflowInstance  @relation(fields: [organizationId, instanceId], references: [organizationId, id], onDelete: Cascade)
+  stageInstance ApprovalStageInstance?    @relation(fields: [organizationId, stageInstanceId], references: [organizationId, id], onDelete: Restrict)
+  actor         User?                     @relation("WorkflowEventActor", fields: [organizationId, actorId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@index([instanceId, createdAt])
+  @@index([organizationId, eventType])
+  @@index([actorId])
+  @@map("approval_workflow_events")
 }
