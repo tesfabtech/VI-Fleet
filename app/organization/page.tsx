@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getAuthorizationContext, PERMISSIONS } from "@/lib/rbac";
 
 const allowedRoles = [
   "ORGANIZATION_ADMINISTRATOR",
@@ -16,7 +17,12 @@ export default async function OrganizationDashboardPage() {
   const organizationId = session.user.organizationId;
   if (!organizationId) notFound();
 
-  const [pendingRequests, approvedAwaitingDispatch, activeDepartments, deptUsers] =
+  const authContext = await getAuthorizationContext();
+  const canManageWorkflows =
+    authContext?.hasPermission(PERMISSIONS.ORG_ROLES_MANAGE) ??
+    (session.user.role === "ORGANIZATION_ADMINISTRATOR");
+
+  const [pendingRequests, approvedAwaitingDispatch, activeDepartments, deptUsers, workflowsCount] =
     await Promise.all([
       prisma.transportationRequest.count({
         where: { organizationId, status: "PENDING", deletedAt: null },
@@ -39,6 +45,14 @@ export default async function OrganizationDashboardPage() {
           deletedAt: null,
         },
       }),
+      canManageWorkflows
+        ? prisma.approvalWorkflow.count({
+            where: {
+              organizationId,
+              deletedAt: null,
+            },
+          })
+        : Promise.resolve(0),
     ]);
 
   const overviewCards = [
@@ -71,6 +85,17 @@ export default async function OrganizationDashboardPage() {
       status: "Available",
       href: "/organization/transport-managers",
     },
+    ...(canManageWorkflows
+      ? [
+          {
+            title: "Approval Workflows",
+            description:
+              "Configure ordered approval stages with ANY_ONE or ALL policies, assign role or user approvers, and manage published workflow versions.",
+            status: `${workflowsCount} Configured`,
+            href: "/organization/workflows",
+          },
+        ]
+      : []),
     {
       title: "Organization Settings",
       description:
