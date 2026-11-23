@@ -221,6 +221,24 @@ function getDefaultNavIcon(label: string): ReactNode {
         </svg>
       );
 
+    case "roles":
+    case "roles & permissions":
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 shrink-0"
+          aria-hidden="true"
+        >
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <path d="M9 12l2 2 4-4" />
+        </svg>
+      );
+
     case "settings":
       return (
         <svg
