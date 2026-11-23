@@ -342,6 +342,8 @@ export async function approveOrganizationApplication(
         },
       });
 
+      await tx.$executeRaw`SELECT provision_organization_built_in_roles(${organization.id}::uuid)`;
+
       const user = await tx.user.create({
         data: {
           organization: {
@@ -356,6 +358,24 @@ export async function approveOrganizationApplication(
           phone: null,
           role: "ORGANIZATION_ADMINISTRATOR",
           status: "INACTIVE",
+        },
+      });
+
+      const orgAdminRole = await tx.organizationRole.findFirstOrThrow({
+        where: {
+          organizationId: organization.id,
+          slug: "org-admin",
+        },
+        select: { id: true },
+      });
+
+      await tx.userRoleAssignment.create({
+        data: {
+          organizationId: organization.id,
+          userId: user.id,
+          roleId: orgAdminRole.id,
+          departmentId: null,
+          status: "PENDING_VERIFICATION",
         },
       });
 

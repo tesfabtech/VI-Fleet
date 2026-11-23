@@ -44,6 +44,29 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum RoleType {
+  BUILT_IN
+  CUSTOM
+}
+
+enum RoleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum RoleScopeAllowed {
+  ORGANIZATION_ONLY
+  DEPARTMENT_ONLY
+  ORGANIZATION_OR_DEPARTMENT
+}
+
+enum RoleAssignmentStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  INACTIVE
+  REVOKED
+}
+
 enum VehicleStatus {
   ACTIVE
   INACTIVE
@@ -218,6 +241,9 @@ model Organization {
 
   departments                 Department[]
   users                       User[]
+  roles                       OrganizationRole[]
+  rolePermissions             RolePermission[]
+  userRoleAssignments         UserRoleAssignment[]
   vehicles                    Vehicle[]
   drivers                     Driver[]
   transportationRequests      TransportationRequest[]
@@ -402,6 +428,7 @@ model Department {
 
   organization               Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   users                      User[]
+  userRoleAssignments        UserRoleAssignment[]
   transportationRequests     TransportationRequest[]
   departmentUserApplications DepartmentUserApplication[]
 
@@ -448,6 +475,11 @@ model User {
 
   createdGeofences Geofence[] @relation("GeofenceCreatedBy")
 
+  createdRoles      OrganizationRole[]   @relation("CreatedRoles")
+  roleAssignments   UserRoleAssignment[] @relation("UserAssignments")
+  assignedUserRoles UserRoleAssignment[] @relation("AssignmentsAssignedBy")
+  revokedUserRoles  UserRoleAssignment[] @relation("AssignmentsRevokedBy")
+
   reviewedApplications OrganizationApplication[] @relation("ApplicationReviewedBy")
   receivedInvitations  OrganizationInvitation[]  @relation("InvitationRecipient")
   createdInvitations   OrganizationInvitation[]  @relation("InvitationCreatedBy")
@@ -468,6 +500,115 @@ model User {
   @@index([organizationId, role])
   @@index([departmentId])
   @@map("users")
+}
+
+// ============================================================
+// PERMISSION
+// ============================================================
+
+model Permission {
+  id             String   @id @default(uuid()) @db.Uuid
+  code           String   @unique @db.VarChar(100)
+  name           String   @db.VarChar(150)
+  description    String?
+  category       String   @db.VarChar(100)
+  isPlatformOnly Boolean  @default(false) @map("is_platform_only")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+// ============================================================
+// ORGANIZATION ROLE
+// ============================================================
+
+model OrganizationRole {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  name           String           @db.VarChar(150)
+  slug           String           @db.VarChar(100)
+  description    String?
+  roleType       RoleType         @default(CUSTOM) @map("role_type")
+  status         RoleStatus       @default(ACTIVE)
+  scopeAllowed   RoleScopeAllowed @default(ORGANIZATION_ONLY) @map("scope_allowed")
+  isSystemRole   Boolean          @default(false) @map("is_system_role")
+  createdById    String?          @map("created_by_id") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?        @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy    User?        @relation("CreatedRoles", fields: [organizationId, createdById], references: [organizationId, id], onDelete: Restrict)
+
+  rolePermissions RolePermission[]
+  userAssignments UserRoleAssignment[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, slug])
+  @@index([organizationId, status])
+  @@index([createdById])
+  @@map("organization_roles")
+}
+
+// ============================================================
+// ROLE PERMISSION
+// ============================================================
+
+model RolePermission {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  roleId         String   @map("role_id") @db.Uuid
+  permissionId   String   @map("permission_id") @db.Uuid
+  isBaseline     Boolean  @default(false) @map("is_baseline")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  role         OrganizationRole @relation(fields: [organizationId, roleId], references: [organizationId, id], onDelete: Cascade)
+  permission   Permission       @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@unique([roleId, permissionId])
+  @@index([organizationId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================================
+// USER ROLE ASSIGNMENT
+// ============================================================
+
+model UserRoleAssignment {
+  id               String               @id @default(uuid()) @db.Uuid
+  organizationId   String               @map("organization_id") @db.Uuid
+  userId           String               @map("user_id") @db.Uuid
+  roleId           String               @map("role_id") @db.Uuid
+  departmentId     String?              @map("department_id") @db.Uuid
+  status           RoleAssignmentStatus @default(ACTIVE)
+  assignedById     String?              @map("assigned_by_id") @db.Uuid
+  assignedAt       DateTime             @default(now()) @map("assigned_at") @db.Timestamptz(6)
+  revokedById      String?              @map("revoked_by_id") @db.Uuid
+  revokedAt        DateTime?            @map("revoked_at") @db.Timestamptz(6)
+  revocationReason String?              @map("revocation_reason")
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User             @relation("UserAssignments", fields: [organizationId, userId], references: [organizationId, id], onDelete: Restrict)
+  role         OrganizationRole @relation(fields: [organizationId, roleId], references: [organizationId, id], onDelete: Restrict)
+  department   Department?      @relation(fields: [organizationId, departmentId], references: [organizationId, id], onDelete: Restrict)
+  assignedBy   User?            @relation("AssignmentsAssignedBy", fields: [organizationId, assignedById], references: [organizationId, id], onDelete: Restrict)
+  revokedBy    User?            @relation("AssignmentsRevokedBy", fields: [organizationId, revokedById], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, userId])
+  @@index([organizationId, roleId])
+  @@index([organizationId, departmentId])
+  @@index([userId, status])
+  @@index([assignedById])
+  @@index([revokedById])
+  @@map("user_role_assignments")
 }
 
 // ============================================================

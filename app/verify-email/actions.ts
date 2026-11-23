@@ -149,6 +149,35 @@ export async function verifyAccountEmail(
           },
         });
       }
+
+      // Activate eligible UserRoleAssignment records for the verified user in their organization.
+      // Activates only pending verification assignments, leaving deliberately inactive or revoked records unchanged.
+      // Excludes inactive/deleted roles or inactive/deleted departments.
+      if (user.organizationId) {
+        await tx.userRoleAssignment.updateMany({
+          where: {
+            userId: verification.userId,
+            organizationId: user.organizationId,
+            status: "PENDING_VERIFICATION",
+            role: {
+              status: "ACTIVE",
+              deletedAt: null,
+            },
+            OR: [
+              { departmentId: null },
+              {
+                department: {
+                  status: "ACTIVE",
+                  deletedAt: null,
+                },
+              },
+            ],
+          },
+          data: {
+            status: "ACTIVE",
+          },
+        });
+      }
     });
   } catch (error) {
     console.error("Account email verification failed:", error);
