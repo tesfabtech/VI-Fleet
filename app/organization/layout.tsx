@@ -15,6 +15,7 @@ const navigation = [
   },
   { label: "Transport Managers", href: "/organization/transport-managers" },
   { label: "Roles & Permissions", href: "/organization/roles" },
+  { label: "Role Assignments", href: "/organization/assignments" },
   { label: "Fleet" },
   { label: "Reports" },
   { label: "Settings", href: "/organization/settings" },
@@ -85,10 +86,17 @@ export default async function OrganizationLayout({
   const canManageRoles =
     authContext?.hasPermission(PERMISSIONS.ORG_ROLES_MANAGE) ??
     (currentUser.role === "ORGANIZATION_ADMINISTRATOR");
+  const canAssignRoles =
+    authContext?.hasPermission(PERMISSIONS.ORG_ROLES_ASSIGN) ??
+    (currentUser.role === "ORGANIZATION_ADMINISTRATOR" ||
+      currentUser.role === "VICE_ORGANIZATION_ADMINISTRATOR");
 
   const visibleNavigation = navigation.filter((item) => {
     if (item.href === "/organization/roles") {
       return canManageRoles;
+    }
+    if (item.href === "/organization/assignments") {
+      return canAssignRoles;
     }
     return true;
   });

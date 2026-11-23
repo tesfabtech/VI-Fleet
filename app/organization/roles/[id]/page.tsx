@@ -282,8 +282,14 @@ export default async function RoleDetailsPage({
 
           <div>
             <dt className="text-xs font-medium text-slate-500">Assigned Users</dt>
-            <dd className="mt-1 font-semibold text-slate-900">
-              {role.assignedUsersCount} active user{role.assignedUsersCount === 1 ? "" : "s"}
+            <dd className="mt-1 font-semibold text-slate-900 flex items-center gap-2">
+              <span>{role.assignedUsersCount} active user{role.assignedUsersCount === 1 ? "" : "s"}</span>
+              <Link
+                href={`/organization/assignments?role=${role.id}`}
+                className="text-xs font-medium text-blue-700 hover:underline"
+              >
+                (View)
+              </Link>
             </dd>
           </div>
 

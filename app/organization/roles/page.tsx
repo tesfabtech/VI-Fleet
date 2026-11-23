@@ -123,21 +123,44 @@ export default async function OrganizationRolesPage({
             View system built-in roles and configure custom roles and permission sets for your organization.
           </p>
         </div>
-        <Link
-          href="/organization/roles/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth="2"
-            stroke="currentColor"
+        <div className="flex items-center gap-3">
+          <Link
+            href="/organization/assignments"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          Create Custom Role
-        </Link>
+            <svg
+              className="h-4 w-4 text-slate-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"
+              />
+              <circle cx="8.5" cy="7" r="4" />
+              <polyline points="17 11 19 13 23 9" />
+            </svg>
+            Role Assignments
+          </Link>
+          <Link
+            href="/organization/roles/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth="2"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Create Custom Role
+          </Link>
+        </div>
       </div>
 
       {/* Notifications */}
