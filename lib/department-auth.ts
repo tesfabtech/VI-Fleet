@@ -94,7 +94,7 @@ export async function requireDepartmentActionContext() {
 export const canEditTransportationRequest = (
   status: TransportationRequestStatus,
   deletedAt?: Date | null,
-) => !deletedAt && status === "PENDING";
+) => !deletedAt && (status === "PENDING" || status === "CHANGES_REQUESTED");
 
 export const canCancelTransportationRequest = (
   status: TransportationRequestStatus,
@@ -103,6 +103,7 @@ export const canCancelTransportationRequest = (
 ) =>
   !deletedAt &&
   (status === "PENDING" ||
+    status === "CHANGES_REQUESTED" ||
     (status === "APPROVED" && (!tripStatus || tripStatus === "SCHEDULED")));
 
 export const canSoftDeleteTransportationRequest = (
@@ -128,7 +129,7 @@ export const canHardDeleteTransportationRequest = (
 export const canReviewTransportationRequest = (
   status: TransportationRequestStatus,
   deletedAt?: Date | null,
-) => !deletedAt && status === "PENDING";
+) => !deletedAt && (status === "PENDING" || status === "CHANGES_REQUESTED");
 
 export type TripTypeOption = "ROUND_TRIP" | "ONE_WAY";
 export type PriorityOption = "STANDARD" | "URGENT";

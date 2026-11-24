@@ -147,6 +147,23 @@ export async function approveTransportationRequest(
         };
       }
 
+      // Workflow guard: Prevent legacy approval if governed by a configurable workflow
+      const workflowInstance = await tx.approvalWorkflowInstance.findFirst({
+        where: {
+          organizationId: ctx.organizationId,
+          entityType: "TRANSPORTATION_REQUEST",
+          entityId: existing.id,
+        },
+      });
+
+      if (workflowInstance) {
+        return {
+          ok: false as const,
+          error:
+            "This request is governed by a configurable approval workflow. Please process decisions through the Approvals Portal at /approvals.",
+        };
+      }
+
       // Stale-review protection: verify the requester didn't edit the request while the Admin was reviewing it
       if (
         expectedUpdatedAt &&
@@ -289,6 +306,23 @@ export async function rejectTransportationRequest(
         return {
           ok: false as const,
           error: `This request cannot be rejected because its status is already ${existing.status}.`,
+        };
+      }
+
+      // Workflow guard: Prevent legacy rejection if governed by a configurable workflow
+      const workflowInstance = await tx.approvalWorkflowInstance.findFirst({
+        where: {
+          organizationId: ctx.organizationId,
+          entityType: "TRANSPORTATION_REQUEST",
+          entityId: existing.id,
+        },
+      });
+
+      if (workflowInstance) {
+        return {
+          ok: false as const,
+          error:
+            "This request is governed by a configurable approval workflow. Please process decisions through the Approvals Portal at /approvals.",
         };
       }
 

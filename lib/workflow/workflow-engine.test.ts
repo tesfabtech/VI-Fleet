@@ -704,7 +704,7 @@ test("9. Optional stage handling: explicit skipping vs mandatory stage enforceme
   const skipRes = await skipOptionalStage({
     organizationId: org.id,
     instanceId: instance.id,
-    actorId: admin.id,
+    actorId: approver2.id,
     reason: "Audit waived due to emergency priority.",
   });
 
@@ -2071,4 +2071,225 @@ test("29. PostgreSQL concurrency regression: version update first blocks and rej
 
   assert.equal(finalInstance.workflowVersionId, v2.id, "Instance pinned version must be V2");
   assert.equal(finalStages.length, 0, "No invalid stage instances from V1 must exist");
+});
+
+test("30. Concurrency: ALL approval policy with simultaneous remaining approvers advances/approves without getting stuck", async () => {
+  const org = await createTestOrg("ALL Concurrency Org");
+  const admin = await createTestUser({ organizationId: org.id });
+  const approver1 = await createTestUser({ organizationId: org.id });
+  const approver2 = await createTestUser({ organizationId: org.id });
+  const requester = await createTestUser({ organizationId: org.id });
+
+  // Part A: Single-stage workflow with ALL policy reaching APPROVED
+  const { version: v1 } = await createWorkflowDraft({
+    organizationId: org.id,
+    name: "ALL Policy Single Stage WF",
+    workflowType: "CONCUR_ALL_WF_1",
+  });
+
+  await addStageToDraft({
+    organizationId: org.id,
+    versionId: v1.id,
+    name: "Both Must Approve Stage",
+    approvalPolicy: "ALL",
+    approvers: [
+      { approverType: "USER", userId: approver1.id },
+      { approverType: "USER", userId: approver2.id },
+    ],
+  });
+
+  await publishWorkflowVersion({
+    organizationId: org.id,
+    versionId: v1.id,
+    publishedById: admin.id,
+  });
+
+  const { instance: instance1 } = await startWorkflowInstance({
+    organizationId: org.id,
+    workflowType: "CONCUR_ALL_WF_1",
+    entityType: "REQ",
+    entityId: "REQ-ALL-1",
+    requesterId: requester.id,
+  });
+
+  // Simultaneously approve by both approver1 and approver2
+  const [res1, res2] = await Promise.all([
+    recordApprovalDecision({
+      organizationId: org.id,
+      instanceId: instance1.id,
+      approverId: approver1.id,
+      decisionType: "APPROVE",
+    }),
+    recordApprovalDecision({
+      organizationId: org.id,
+      instanceId: instance1.id,
+      approverId: approver2.id,
+      decisionType: "APPROVE",
+    }),
+  ]);
+
+  // One decision was recorded first, and the second completed and approved the workflow
+  const outcomes1 = [res1.outcome, res2.outcome].sort();
+  assert.deepEqual(outcomes1, ["DECISION_RECORDED", "WORKFLOW_APPROVED"]);
+
+  const finalState1 = await getWorkflowInstanceState({
+    organizationId: org.id,
+    instanceId: instance1.id,
+  });
+  assert.equal(finalState1.instance.status, "APPROVED", "Workflow must reach APPROVED, not remain stuck in IN_PROGRESS");
+  assert.equal(finalState1.activeStageInstance, null);
+  assert.equal(finalState1.instance.stageInstances[0].status, "APPROVED");
+
+  // Verify both decisions exist in database
+  const decisions1 = await prisma.approvalDecision.findMany({
+    where: { instanceId: instance1.id },
+  });
+  assert.equal(decisions1.length, 2);
+  const decidedUsers1 = new Set(decisions1.map((d) => d.approverId));
+  assert.ok(decidedUsers1.has(approver1.id));
+  assert.ok(decidedUsers1.has(approver2.id));
+
+  // Part B: Two-stage workflow with ALL policy on Stage 1 reaching Stage 2
+  const approver3 = await createTestUser({ organizationId: org.id });
+
+  const { version: v2 } = await createWorkflowDraft({
+    organizationId: org.id,
+    name: "ALL Policy Multi-Stage WF",
+    workflowType: "CONCUR_ALL_WF_2",
+  });
+
+  await addStageToDraft({
+    organizationId: org.id,
+    versionId: v2.id,
+    name: "Stage 1 Both Required",
+    approvalPolicy: "ALL",
+    approvers: [
+      { approverType: "USER", userId: approver1.id },
+      { approverType: "USER", userId: approver2.id },
+    ],
+  });
+
+  await addStageToDraft({
+    organizationId: org.id,
+    versionId: v2.id,
+    name: "Stage 2 Final Approval",
+    approvalPolicy: "ANY_ONE",
+    approvers: [{ approverType: "USER", userId: approver3.id }],
+  });
+
+  await publishWorkflowVersion({
+    organizationId: org.id,
+    versionId: v2.id,
+    publishedById: admin.id,
+  });
+
+  const { instance: instance2 } = await startWorkflowInstance({
+    organizationId: org.id,
+    workflowType: "CONCUR_ALL_WF_2",
+    entityType: "REQ",
+    entityId: "REQ-ALL-2",
+    requesterId: requester.id,
+  });
+
+  // Simultaneously approve Stage 1 by both approver1 and approver2
+  const [resA, resB] = await Promise.all([
+    recordApprovalDecision({
+      organizationId: org.id,
+      instanceId: instance2.id,
+      approverId: approver1.id,
+      decisionType: "APPROVE",
+    }),
+    recordApprovalDecision({
+      organizationId: org.id,
+      instanceId: instance2.id,
+      approverId: approver2.id,
+      decisionType: "APPROVE",
+    }),
+  ]);
+
+  const outcomes2 = [resA.outcome, resB.outcome].sort();
+  assert.deepEqual(outcomes2, ["DECISION_RECORDED", "STAGE_ADVANCED"]);
+
+  const finalState2 = await getWorkflowInstanceState({
+    organizationId: org.id,
+    instanceId: instance2.id,
+  });
+  assert.equal(finalState2.instance.status, "IN_PROGRESS");
+  assert.ok(finalState2.activeStageInstance);
+  assert.equal(finalState2.activeStageInstance.stageOrder, 2, "Workflow must advance to Stage 2 rather than getting stuck");
+  assert.equal(finalState2.instance.stageInstances[0].status, "APPROVED");
+});
+
+test("31. Concurrency: Simultaneous decision and cancellation safely serializes without state corruption", async () => {
+  const org = await createTestOrg("Decision Cancel Concurrency Org");
+  const admin = await createTestUser({ organizationId: org.id });
+  const approver = await createTestUser({ organizationId: org.id });
+  const requester = await createTestUser({ organizationId: org.id });
+
+  const { version } = await createWorkflowDraft({
+    organizationId: org.id,
+    name: "Decision vs Cancel WF",
+    workflowType: "CONCUR_DECIDE_CANCEL_WF",
+  });
+
+  await addStageToDraft({
+    organizationId: org.id,
+    versionId: version.id,
+    name: "Single Review Stage",
+    approvalPolicy: "ANY_ONE",
+    approvers: [{ approverType: "USER", userId: approver.id }],
+  });
+
+  await publishWorkflowVersion({
+    organizationId: org.id,
+    versionId: version.id,
+    publishedById: admin.id,
+  });
+
+  const { instance } = await startWorkflowInstance({
+    organizationId: org.id,
+    workflowType: "CONCUR_DECIDE_CANCEL_WF",
+    entityType: "REQ",
+    entityId: "REQ-CANCEL-CONCUR",
+    requesterId: requester.id,
+  });
+
+  // Concurrently approve and cancel
+  const results = await Promise.allSettled([
+    recordApprovalDecision({
+      organizationId: org.id,
+      instanceId: instance.id,
+      approverId: approver.id,
+      decisionType: "APPROVE",
+    }),
+    cancelWorkflowInstance({
+      organizationId: org.id,
+      instanceId: instance.id,
+      actorId: admin.id,
+      reason: "Concurrent administrative cancellation",
+    }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === "fulfilled");
+  const rejected = results.filter((r) => r.status === "rejected");
+
+  // Exactly one succeeded, and the second was safely rejected due to serialized state transition
+  assert.equal(fulfilled.length, 1);
+  assert.equal(rejected.length, 1);
+  assert.ok(rejected[0].status === "rejected" && rejected[0].reason instanceof StageNotActiveError);
+
+  const finalState = await getWorkflowInstanceState({
+    organizationId: org.id,
+    instanceId: instance.id,
+  });
+
+  if (results[0].status === "fulfilled") {
+    // Approval won
+    assert.equal(finalState.instance.status, "APPROVED");
+    assert.equal(finalState.instance.stageInstances[0].status, "APPROVED");
+  } else {
+    // Cancellation won
+    assert.equal(finalState.instance.status, "CANCELLED");
+    assert.equal(finalState.instance.stageInstances[0].status, "CANCELLED");
+  }
 });

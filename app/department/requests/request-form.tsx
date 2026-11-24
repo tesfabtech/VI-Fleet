@@ -7,6 +7,7 @@ import {
   createTransportationRequest,
   emptyDepartmentRecycleBin,
   permanentlyDeleteTransportationRequest,
+  resubmitTransportationRequest,
   restoreTransportationRequest,
   softDeleteTransportationRequest,
   updateTransportationRequest,
@@ -38,11 +39,12 @@ export type RequestFormInitialValues = {
 };
 
 type RequestFormProps = {
-  mode: "create" | "edit";
+  mode: "create" | "edit" | "resubmit";
   initialValues: RequestFormInitialValues;
   maxVehicleCapacity: number;
   departmentName: string;
   organizationName: string;
+  changesReason?: string | null;
 };
 
 const inputCls =
@@ -54,10 +56,17 @@ export default function RequestForm({
   maxVehicleCapacity,
   departmentName,
   organizationName,
+  changesReason,
 }: RequestFormProps) {
   const router = useRouter();
+  const actionFn =
+    mode === "create"
+      ? createTransportationRequest
+      : mode === "resubmit"
+        ? resubmitTransportationRequest
+        : updateTransportationRequest;
   const [state, formAction, isPending] = useActionState<RequestActionState, FormData>(
-    mode === "create" ? createTransportationRequest : updateTransportationRequest,
+    actionFn,
     {},
   );
   const [passengers, setPassengers] = useState(init.passengerCount || 1);
@@ -67,7 +76,7 @@ export default function RequestForm({
     if (!state.ok) return;
     if (mode === "create" && state.requestId) {
       router.push(`/department/requests/${state.requestId}?submitted=1`);
-    } else if (mode === "edit" && init.requestId) {
+    } else if ((mode === "edit" || mode === "resubmit") && init.requestId) {
       router.replace(`/department/requests/${init.requestId}?updated=1`);
       router.refresh();
     }
@@ -241,6 +250,31 @@ export default function RequestForm({
         </div>
       </div>
 
+      {mode === "resubmit" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-6 shadow-xs space-y-3">
+          <h2 className="text-base font-bold text-amber-900">
+            Resubmission Notes for Approver
+          </h2>
+          {changesReason && (
+            <div className="rounded-xl bg-white p-3 border border-amber-200 text-xs text-amber-900">
+              <span className="font-bold">Approver Feedback:</span> {changesReason}
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Response / Explanation of Changes (Optional)
+            </label>
+            <textarea
+              name="comment"
+              rows={2}
+              maxLength={500}
+              placeholder="e.g. Adjusted passenger count to 12 and attached updated itinerary..."
+              className={inputCls}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end">
         <button
           type="submit"
@@ -250,10 +284,14 @@ export default function RequestForm({
           {isPending
             ? mode === "create"
               ? "Submitting..."
-              : "Saving..."
+              : mode === "resubmit"
+                ? "Resubmitting..."
+                : "Saving..."
             : mode === "create"
               ? "Submit Transportation Request"
-              : "Save Request Changes"}
+              : mode === "resubmit"
+                ? "Resubmit Request for Approval"
+                : "Save Request Changes"}
         </button>
       </div>
     </form>

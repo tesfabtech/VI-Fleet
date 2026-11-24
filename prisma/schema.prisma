@@ -90,6 +90,7 @@ enum TransportationRequestStatus {
   APPROVED
   REJECTED
   CANCELLED
+  CHANGES_REQUESTED
 }
 
 enum TripStatus {
@@ -247,6 +248,7 @@ enum StageInstanceStatus {
   REJECTED
   CHANGES_REQUESTED
   SKIPPED
+  CANCELLED
 }
 
 enum ApprovalDecisionType {
@@ -1566,7 +1568,7 @@ model ApprovalWorkflowInstance {
   events          ApprovalWorkflowEvent[]
 
   @@unique([organizationId, id])
-  @@index([organizationId, entityType, entityId])
+  @@unique([organizationId, entityType, entityId])
   @@index([organizationId, status])
   @@index([organizationId, requesterId])
   @@index([workflowVersionId])

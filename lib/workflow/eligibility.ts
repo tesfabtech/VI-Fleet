@@ -128,7 +128,7 @@ export async function evaluateApproverEligibility(
       };
     }
 
-    const authContext = await resolveAuthorizationContextForUser(userId);
+    const authContext = await resolveAuthorizationContextForUser(userId, tx);
     if (!authContext) {
       return {
         eligible: false,

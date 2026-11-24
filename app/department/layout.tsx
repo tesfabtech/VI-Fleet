@@ -6,6 +6,7 @@ const navigation = [
   { label: "Overview", href: "/department" },
   { label: "Transport Requests", href: "/department/requests" },
   { label: "New Request", href: "/department/requests/new" },
+  { label: "Approvals Inbox", href: "/approvals" },
   { label: "Recycle Bin", href: "/department/requests/recycle-bin" },
 ];
 

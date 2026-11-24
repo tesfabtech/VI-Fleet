@@ -17,6 +17,7 @@ const navigation = [
   { label: "Roles & Permissions", href: "/organization/roles" },
   { label: "Role Assignments", href: "/organization/assignments" },
   { label: "Approval Workflows", href: "/organization/workflows" },
+  { label: "Approvals Inbox", href: "/approvals" },
   { label: "Fleet" },
   { label: "Reports" },
   { label: "Settings", href: "/organization/settings" },
