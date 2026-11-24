@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import type {
   ActiveAssignment,
   AuthorizationContext,
@@ -81,8 +82,10 @@ export function evaluateAssignmentPermission(
  */
 export async function resolveAuthorizationContextForUser(
   userId: string,
+  tx?: Prisma.TransactionClient,
 ): Promise<AuthorizationContext | null> {
-  const user = await prisma.user.findUnique({
+  const db = tx ?? prisma;
+  const user = await db.user.findUnique({
     where: { id: userId },
     select: {
       id: true,

@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import type { TransportationRequestStatus, TripStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
+  cancelWorkflowInstance,
+  resubmitWorkflowInstance,
+  startWorkflowInstance,
+} from "@/lib/workflow";
+import {
   encodeSpecialRequirements,
   requireDepartmentActionContext,
   type PriorityOption,
@@ -33,6 +38,7 @@ const canCancelStatus = (
 ) =>
   !deletedAt &&
   (status === "PENDING" ||
+    status === "CHANGES_REQUESTED" ||
     (status === "APPROVED" && (!tripStatus || tripStatus === "SCHEDULED")));
 
 const canSoftDeleteStatus = (
@@ -269,6 +275,62 @@ export async function createTransportationRequest(
         select: { id: true },
       });
 
+      // Workflow resolution: resolve active workflow for TRANSPORTATION_REQUEST
+      const activeWorkflows = await tx.approvalWorkflow.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          workflowType: "TRANSPORTATION_REQUEST",
+          status: "ACTIVE",
+          deletedAt: null,
+        },
+        include: {
+          currentVersion: {
+            include: {
+              stages: {
+                include: { approvers: true },
+                orderBy: { stageOrder: "asc" },
+              },
+            },
+          },
+        },
+      });
+
+      if (activeWorkflows.length > 1) {
+        throw new Error(
+          "Multiple active approval workflows found for transportation requests. Please contact your organization administrator.",
+        );
+      } else if (activeWorkflows.length === 1) {
+        const wf = activeWorkflows[0];
+        if (!wf.currentVersionId || !wf.currentVersion) {
+          throw new Error(
+            `Configured approval workflow "${wf.name}" has no published version.`,
+          );
+        }
+        if (wf.currentVersion.status !== "PUBLISHED") {
+          throw new Error(
+            `Configured approval workflow version (v${wf.currentVersion.versionNumber}) is not published.`,
+          );
+        }
+        if (wf.currentVersion.stages.length === 0) {
+          throw new Error(
+            `Configured approval workflow version (v${wf.currentVersion.versionNumber}) has no approval stages.`,
+          );
+        }
+
+        // Initialize workflow instance atomically
+        await startWorkflowInstance({
+          organizationId: ctx.organizationId,
+          workflowType: "TRANSPORTATION_REQUEST",
+          entityType: "TRANSPORTATION_REQUEST",
+          entityId: req.id,
+          requesterId: ctx.userId,
+          departmentId: ctx.departmentId,
+          tx,
+          resolvedWorkflow: wf,
+        });
+      }
+      // If activeWorkflows.length === 0: Explicit legacy fallback (status stays PENDING, no instance)
+
       await tx.alert.create({
         data: {
           organizationId: ctx.organizationId,
@@ -288,10 +350,12 @@ export async function createTransportationRequest(
 
     revalidateDepartmentPaths(created.id);
     return { ok: true, requestId: created.id, message: "Request submitted." };
-  } catch (err) {
+  } catch (err: any) {
     console.error("createTransportationRequest failed:", err);
     return {
-      error: "Could not submit your transportation request. Please try again.",
+      error:
+        err?.message ||
+        "Could not submit your transportation request. Please try again.",
     };
   }
 }
@@ -413,6 +477,30 @@ export async function cancelTransportationRequest(
         };
       }
 
+      // If there is an in-flight workflow instance, cancel it atomically
+      const workflowInstance = await tx.approvalWorkflowInstance.findFirst({
+        where: {
+          organizationId: ctx.organizationId,
+          entityType: "TRANSPORTATION_REQUEST",
+          entityId: requestId,
+        },
+      });
+
+      if (
+        workflowInstance &&
+        workflowInstance.status !== "APPROVED" &&
+        workflowInstance.status !== "REJECTED" &&
+        workflowInstance.status !== "CANCELLED"
+      ) {
+        await cancelWorkflowInstance({
+          organizationId: ctx.organizationId,
+          instanceId: workflowInstance.id,
+          actorId: ctx.userId,
+          reason: cancellationReason,
+          tx,
+        });
+      }
+
       if (req.trip?.status === "SCHEDULED") {
         await tx.trip.update({
           where: { id: req.trip.id },
@@ -451,9 +539,126 @@ export async function cancelTransportationRequest(
 
     revalidateDepartmentPaths(requestId);
     return { ok: true, requestId, message: "Request cancelled." };
-  } catch (err) {
+  } catch (err: any) {
     console.error("cancelTransportationRequest failed:", err);
-    return { error: "Could not cancel the request. Please try again." };
+    return {
+      error:
+        err?.message || "Could not cancel the request. Please try again.",
+    };
+  }
+}
+
+export async function resubmitTransportationRequest(
+  _prev: RequestActionState,
+  formData: FormData,
+): Promise<RequestActionState> {
+  try {
+    const authRes = await requireDepartmentActionContext();
+    if (!authRes.ok) return { error: authRes.error };
+    const { ctx } = authRes;
+
+    const requestId = String(formData.get("requestId") ?? "").trim();
+    if (!isUuid(requestId)) return { error: "Invalid request ID." };
+
+    const comment = String(
+      formData.get("comment") ?? formData.get("resubmitComment") ?? "",
+    ).trim();
+
+    const { data, fieldErrors, error } = validateRequestForm(formData, false);
+    if (!data) return { error, fieldErrors };
+
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.transportationRequest.findFirst({
+        where: {
+          id: requestId,
+          organizationId: ctx.organizationId,
+          departmentId: ctx.departmentId,
+          requestedById: ctx.userId,
+          deletedAt: null,
+        },
+      });
+
+      if (!existing) {
+        return { ok: false as const, error: "Transportation request not found." };
+      }
+
+      if (existing.status !== "CHANGES_REQUESTED") {
+        return {
+          ok: false as const,
+          error: `Cannot resubmit request with status "${existing.status}". Request must be in CHANGES_REQUESTED status.`,
+        };
+      }
+
+      const workflowInstance = await tx.approvalWorkflowInstance.findFirst({
+        where: {
+          organizationId: ctx.organizationId,
+          entityType: "TRANSPORTATION_REQUEST",
+          entityId: requestId,
+        },
+      });
+
+      if (!workflowInstance) {
+        return {
+          ok: false as const,
+          error: "No approval workflow instance found for this request.",
+        };
+      }
+
+      // Update transportation request back to PENDING
+      await tx.transportationRequest.update({
+        where: { id: requestId },
+        data: {
+          purpose: data.purpose,
+          description: data.description,
+          origin: data.origin,
+          destination: data.destination,
+          passengerCount: data.passengerCount,
+          requestedStart: data.requestedStart,
+          requestedEnd: data.requestedEnd,
+          specialRequirements: data.specialRequirements,
+          notes: data.notes,
+          status: "PENDING",
+        },
+      });
+
+      // Resubmit workflow instance
+      await resubmitWorkflowInstance({
+        organizationId: ctx.organizationId,
+        instanceId: workflowInstance.id,
+        requesterId: ctx.userId,
+        comment: comment || undefined,
+        tx,
+      });
+
+      await tx.alert.create({
+        data: {
+          organizationId: ctx.organizationId,
+          alertType: "TRANSPORTATION_REQUEST_SUBMITTED",
+          severity: data.priority === "URGENT" ? "WARNING" : "INFO",
+          title: `Request Resubmitted: ${data.purpose}`.slice(0, 200),
+          message: `${ctx.userName} (${ctx.departmentName}) resubmitted transport request after corrections.`,
+          status: "OPEN",
+          occurredAt: new Date(),
+        },
+      });
+
+      return { ok: true as const };
+    });
+
+    if (!result.ok) return { error: result.error };
+
+    revalidateDepartmentPaths(requestId);
+    return {
+      ok: true,
+      requestId,
+      message: "Transportation request resubmitted for approval.",
+    };
+  } catch (err: any) {
+    console.error("resubmitTransportationRequest failed:", err);
+    return {
+      error:
+        err?.message || "Could not resubmit your request. Please try again.",
+    };
   }
 }
 

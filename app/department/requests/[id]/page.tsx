@@ -21,6 +21,7 @@ import RequestForm, {
 
 const statusBadge: Record<string, string> = {
   PENDING: "bg-amber-50 text-amber-800 border-amber-200",
+  CHANGES_REQUESTED: "bg-amber-100 text-amber-900 border-amber-300",
   APPROVED: "bg-emerald-50 text-emerald-800 border-emerald-200",
   REJECTED: "bg-rose-50 text-rose-800 border-rose-200",
   CANCELLED: "bg-slate-100 text-slate-700 border-slate-300",
@@ -41,7 +42,7 @@ export default async function DepartmentRequestDetailPage({
 
   if (!isUuid(id)) notFound();
 
-  const [request, maxVeh] = await Promise.all([
+  const [request, maxVeh, workflowInstance] = await Promise.all([
     prisma.transportationRequest.findFirst({
       where: {
         id,
@@ -70,6 +71,38 @@ export default async function DepartmentRequestDetailPage({
     prisma.vehicle.aggregate({
       where: { organizationId: ctx.organizationId, status: "ACTIVE", deletedAt: null },
       _max: { seatingCapacity: true },
+    }),
+    prisma.approvalWorkflowInstance.findFirst({
+      where: {
+        organizationId: ctx.organizationId,
+        entityType: "TRANSPORTATION_REQUEST",
+        entityId: id,
+      },
+      include: {
+        workflow: { select: { id: true, name: true, workflowType: true } },
+        workflowVersion: {
+          select: {
+            versionNumber: true,
+            stages: {
+              orderBy: { stageOrder: "asc" },
+            },
+          },
+        },
+        stageInstances: {
+          orderBy: [{ stageOrder: "asc" }, { iteration: "asc" }],
+          include: {
+            stage: true,
+            decisions: {
+              orderBy: { decidedAt: "asc" },
+              include: {
+                approver: {
+                  select: { firstName: true, middleName: true, lastName: true, email: true },
+                },
+              },
+            },
+          },
+        },
+      },
     }),
   ]);
 
@@ -106,6 +139,17 @@ export default async function DepartmentRequestDetailPage({
         .join(" ")
         .trim() || request.reviewedBy.email
     : null;
+
+  let latestChangeRequestReason: string | null = null;
+  if (request.status === "CHANGES_REQUESTED" && workflowInstance) {
+    for (const si of workflowInstance.stageInstances) {
+      for (const dec of si.decisions) {
+        if (dec.decisionType === "REQUEST_CHANGES" && dec.comment) {
+          latestChangeRequestReason = dec.comment;
+        }
+      }
+    }
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -145,9 +189,17 @@ export default async function DepartmentRequestDetailPage({
                     ? `/department/requests/${request.id}`
                     : `/department/requests/${request.id}?edit=1#edit-request-form`
                 }
-                className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-amber-600"
+                className={`rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-2xs ${
+                  request.status === "CHANGES_REQUESTED"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-amber-500 hover:bg-amber-600"
+                }`}
               >
-                {isEditing ? "View Read-Only Summary" : "Edit Request"}
+                {isEditing
+                  ? "View Read-Only Summary"
+                  : request.status === "CHANGES_REQUESTED"
+                    ? "Edit & Resubmit Request"
+                    : "Edit Request"}
               </Link>
             )}
             <Link
@@ -193,40 +245,215 @@ export default async function DepartmentRequestDetailPage({
         </div>
       )}
 
-      {/* 4-Step Timeline */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-        <h2 className="text-xs font-bold tracking-wider text-slate-500 uppercase">Status Timeline</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-4 text-xs">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
-            <p className="font-bold text-emerald-900">1. Submitted</p>
-            <p className="mt-1 text-emerald-700">{formatAddisDateTime(request.createdAt)}</p>
+      {/* Workflow Timeline (or Legacy 4-Step Timeline Fallback) */}
+      {workflowInstance ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Approval Workflow Progress
+              </h2>
+              <p className="text-xs text-slate-500">
+                {workflowInstance.workflow.name} (v{workflowInstance.workflowVersion.versionNumber})
+              </p>
+            </div>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                statusBadge[request.status] ?? "bg-slate-100 text-slate-700"
+              }`}
+            >
+              {request.status}
+            </span>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="font-bold text-slate-900">2. Manager Review</p>
-            <p className="mt-1 text-slate-600">
-              {request.reviewedAt ? `${request.status} (${formatAddisDateTime(request.reviewedAt)})` : "Pending decision"}
-            </p>
+
+          <div className="space-y-4 pt-2">
+            {workflowInstance.workflowVersion.stages.map((stg) => {
+              const stageInstancesForStage = workflowInstance.stageInstances.filter(
+                (si) => si.stageId === stg.id,
+              );
+              const latestStageInstance =
+                stageInstancesForStage[stageInstancesForStage.length - 1];
+              const stgStatus = latestStageInstance?.status ?? "PENDING";
+              const isCurrent = latestStageInstance?.status === "IN_PROGRESS";
+
+              return (
+                <div
+                  key={stg.id}
+                  className={`rounded-xl border p-4 transition ${
+                    isCurrent
+                      ? "border-blue-300 bg-blue-50/40"
+                      : stgStatus === "APPROVED"
+                        ? "border-emerald-200 bg-emerald-50/30"
+                        : stgStatus === "CHANGES_REQUESTED"
+                          ? "border-amber-300 bg-amber-50/40"
+                          : stgStatus === "REJECTED"
+                            ? "border-rose-200 bg-rose-50/30"
+                            : "border-slate-200 bg-slate-50/50"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-slate-300 text-xs font-bold text-slate-700">
+                        {stg.stageOrder}
+                      </span>
+                      <span className="text-sm font-bold text-slate-900">
+                        {stg.name}
+                      </span>
+                      {stg.isOptional && (
+                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-2xs font-medium text-slate-700">
+                          Optional
+                        </span>
+                      )}
+                      {latestStageInstance && latestStageInstance.iteration > 1 && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold text-amber-800">
+                          Iteration {latestStageInstance.iteration}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-2xs font-bold uppercase ${
+                          stgStatus === "APPROVED"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : stgStatus === "IN_PROGRESS"
+                              ? "bg-blue-100 text-blue-800"
+                              : stgStatus === "CHANGES_REQUESTED"
+                                ? "bg-amber-100 text-amber-800"
+                                : stgStatus === "REJECTED"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : stgStatus === "SKIPPED"
+                                    ? "bg-slate-200 text-slate-700"
+                                    : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {stgStatus === "IN_PROGRESS"
+                          ? "In Progress"
+                          : stgStatus === "CHANGES_REQUESTED"
+                            ? "Changes Requested"
+                            : stgStatus}
+                      </span>
+                      {latestStageInstance?.enteredAt && (
+                        <span className="text-2xs text-slate-400">
+                          {formatAddisDateTime(latestStageInstance.enteredAt)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stage Iterations & Decisions History */}
+                  {stageInstancesForStage.map((siInst) => (
+                    <div key={siInst.id} className="mt-2 space-y-1">
+                      {siInst.decisions.map((dec) => {
+                        const approverName =
+                          [dec.approver.firstName, dec.approver.middleName, dec.approver.lastName]
+                            .filter(Boolean)
+                            .join(" ") ||
+                          dec.approver.email ||
+                          "Approver";
+
+                        return (
+                          <div
+                            key={dec.id}
+                            className="rounded-lg bg-white p-2.5 text-xs border border-slate-200/80 mt-1"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-slate-800">
+                                {approverName}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`rounded px-1.5 py-0.5 text-2xs font-bold uppercase ${
+                                    dec.decisionType === "APPROVE"
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : dec.decisionType === "REJECT"
+                                        ? "bg-rose-100 text-rose-800"
+                                        : dec.decisionType === "REQUEST_CHANGES"
+                                          ? "bg-amber-100 text-amber-800"
+                                          : "bg-slate-100 text-slate-700"
+                                  }`}
+                                >
+                                  {dec.decisionType}
+                                </span>
+                                <span className="text-2xs text-slate-400">
+                                  {formatAddisDateTime(dec.decidedAt)}
+                                </span>
+                              </div>
+                            </div>
+                            {dec.comment && (
+                              <p className="mt-1 text-slate-600 italic">
+                                &ldquo;{dec.comment}&rdquo;
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="font-bold text-slate-900">3. Vehicle Dispatch</p>
-            <p className="mt-1 text-slate-600">
-              {request.trip ? `${request.trip.vehicle.registrationNumber} (${request.trip.status})` : "Not assigned yet"}
-            </p>
+        </section>
+      ) : (
+        /* 4-Step Timeline for Legacy Requests */
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <h2 className="text-xs font-bold tracking-wider text-slate-500 uppercase">Status Timeline (Legacy)</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-4 text-xs">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+              <p className="font-bold text-emerald-900">1. Submitted</p>
+              <p className="mt-1 text-emerald-700">{formatAddisDateTime(request.createdAt)}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="font-bold text-slate-900">2. Manager Review</p>
+              <p className="mt-1 text-slate-600">
+                {request.reviewedAt ? `${request.status} (${formatAddisDateTime(request.reviewedAt)})` : "Pending decision"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="font-bold text-slate-900">3. Vehicle Dispatch</p>
+              <p className="mt-1 text-slate-600">
+                {request.trip ? `${request.trip.vehicle.registrationNumber} (${request.trip.status})` : "Not assigned yet"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="font-bold text-slate-900">
+                4. {request.status === "CANCELLED" ? "Cancelled" : "Completion"}
+              </p>
+              <p className="mt-1 text-slate-600">
+                {request.status === "CANCELLED"
+                  ? formatAddisDateTime(request.updatedAt)
+                  : request.trip?.actualEnd
+                    ? formatAddisDateTime(request.trip.actualEnd)
+                    : "Scheduled"}
+              </p>
+            </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="font-bold text-slate-900">
-              4. {request.status === "CANCELLED" ? "Cancelled" : "Completion"}
-            </p>
-            <p className="mt-1 text-slate-600">
-              {request.status === "CANCELLED"
-                ? formatAddisDateTime(request.updatedAt)
-                : request.trip?.actualEnd
-                  ? formatAddisDateTime(request.trip.actualEnd)
-                  : "Scheduled"}
-            </p>
+        </section>
+      )}
+
+      {/* Changes Requested Revision Banner */}
+      {request.status === "CHANGES_REQUESTED" && (
+        <section className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-xs text-amber-950">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-amber-900">Changes Requested by Approver</p>
+              <p className="mt-1 text-amber-800">
+                {latestChangeRequestReason ||
+                  "The reviewer has requested revisions to this transportation request. Please edit and resubmit with the requested updates."}
+              </p>
+            </div>
+            {canEdit && (
+              <Link
+                href={`/department/requests/${request.id}?edit=1#edit-request-form`}
+                className="shrink-0 rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-amber-700"
+              >
+                Edit & Resubmit Request →
+              </Link>
+            )}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Decision Banners */}
       {request.status === "REJECTED" && (
@@ -357,14 +584,21 @@ export default async function DepartmentRequestDetailPage({
         <section id="edit-request-form" className="space-y-3 scroll-mt-24">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Edit Pending Request</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                {request.status === "CHANGES_REQUESTED"
+                  ? "Edit & Resubmit Request"
+                  : "Edit Pending Request"}
+              </h2>
               <p className="text-xs text-slate-500">
-                Update any field below while this request remains in PENDING status.
+                {request.status === "CHANGES_REQUESTED"
+                  ? "Update your request with the requested changes and submit for approval."
+                  : "Update any field below while this request remains in PENDING status."}
               </p>
             </div>
           </div>
           <RequestForm
-            mode="edit"
+            mode={request.status === "CHANGES_REQUESTED" ? "resubmit" : "edit"}
+            changesReason={latestChangeRequestReason}
             initialValues={{
               requestId: request.id,
               purpose: request.purpose,

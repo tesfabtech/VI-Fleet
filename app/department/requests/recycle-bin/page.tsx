@@ -15,6 +15,7 @@ import {
 
 const STATUSES: TransportationRequestStatus[] = [
   "PENDING",
+  "CHANGES_REQUESTED",
   "APPROVED",
   "REJECTED",
   "CANCELLED",
@@ -22,6 +23,7 @@ const STATUSES: TransportationRequestStatus[] = [
 
 const statusStyles: Record<TransportationRequestStatus, string> = {
   PENDING: "bg-amber-50 text-amber-800 border-amber-200",
+  CHANGES_REQUESTED: "bg-amber-100 text-amber-900 border-amber-300",
   APPROVED: "bg-emerald-50 text-emerald-800 border-emerald-200",
   REJECTED: "bg-rose-50 text-rose-800 border-rose-200",
   CANCELLED: "bg-slate-100 text-slate-600 border-slate-200",

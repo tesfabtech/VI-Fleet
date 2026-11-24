@@ -77,6 +77,21 @@ export interface CreateDraftFromVersionInput {
   createdById?: string;
 }
 
+export type ApprovalWorkflowWithVersion = Prisma.ApprovalWorkflowGetPayload<{
+  include: {
+    currentVersion: {
+      include: {
+        stages: {
+          include: {
+            approvers: true;
+          };
+          orderBy: { stageOrder: "asc" };
+        };
+      };
+    };
+  };
+}>;
+
 export interface StartWorkflowInstanceInput {
   organizationId: string;
   workflowType: string;
@@ -84,6 +99,8 @@ export interface StartWorkflowInstanceInput {
   entityId: string;
   requesterId: string;
   departmentId?: string | null;
+  tx?: Prisma.TransactionClient;
+  resolvedWorkflow?: ApprovalWorkflowWithVersion;
 }
 
 export interface RecordDecisionInput {
@@ -92,6 +109,7 @@ export interface RecordDecisionInput {
   approverId: string;
   decisionType: ApprovalDecisionType;
   comment?: string | null;
+  tx?: Prisma.TransactionClient;
 }
 
 export interface SkipOptionalStageInput {
@@ -99,6 +117,7 @@ export interface SkipOptionalStageInput {
   instanceId: string;
   actorId: string;
   reason: string;
+  tx?: Prisma.TransactionClient;
 }
 
 export interface ResubmitWorkflowInput {
@@ -106,6 +125,7 @@ export interface ResubmitWorkflowInput {
   instanceId: string;
   requesterId: string;
   comment?: string | null;
+  tx?: Prisma.TransactionClient;
 }
 
 export interface CancelWorkflowInput {
@@ -113,6 +133,7 @@ export interface CancelWorkflowInput {
   instanceId: string;
   actorId: string;
   reason: string;
+  tx?: Prisma.TransactionClient;
 }
 
 export interface ApproverEligibilityResult {

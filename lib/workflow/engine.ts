@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import {
   evaluateApproverEligibility,
   getEligibleApproverIdsForStage,
@@ -16,6 +17,7 @@ import {
   WorkflowValidationError,
 } from "./errors";
 import type {
+  ApprovalWorkflowWithVersion,
   CancelWorkflowInput,
   RecordDecisionInput,
   ResubmitWorkflowInput,
@@ -38,6 +40,8 @@ export async function startWorkflowInstance(input: StartWorkflowInstanceInput) {
     entityId,
     requesterId,
     departmentId,
+    tx: callerTx,
+    resolvedWorkflow,
   } = input;
 
   if (!workflowType) {
@@ -50,7 +54,7 @@ export async function startWorkflowInstance(input: StartWorkflowInstanceInput) {
     throw new WorkflowValidationError("Requester ID is required.");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const run = async (tx: Prisma.TransactionClient) => {
     // 1. Verify requester belongs to organization and is active
     const requester = await tx.user.findFirst({
       where: { id: requesterId, organizationId, deletedAt: null },
@@ -73,24 +77,30 @@ export async function startWorkflowInstance(input: StartWorkflowInstanceInput) {
       }
     }
 
-    // 3. Find active workflow for this workflowType
-    const workflow = await tx.approvalWorkflow.findFirst({
-      where: {
-        organizationId,
-        workflowType,
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-      include: {
-        currentVersion: {
-          include: {
-            stages: {
-              orderBy: { stageOrder: "asc" },
+    // 3. Find active workflow for this workflowType (or use resolvedWorkflow if provided)
+    let workflow: ApprovalWorkflowWithVersion | null = null;
+    if (resolvedWorkflow) {
+      workflow = resolvedWorkflow;
+    } else {
+      workflow = (await tx.approvalWorkflow.findFirst({
+        where: {
+          organizationId,
+          workflowType,
+          status: "ACTIVE",
+          deletedAt: null,
+        },
+        include: {
+          currentVersion: {
+            include: {
+              stages: {
+                include: { approvers: true },
+                orderBy: { stageOrder: "asc" },
+              },
             },
           },
         },
-      },
-    });
+      })) as ApprovalWorkflowWithVersion | null;
+    }
 
     if (!workflow) {
       throw new WorkflowNotFoundError(
@@ -185,7 +195,9 @@ export async function startWorkflowInstance(input: StartWorkflowInstanceInput) {
       stageInstance,
       firstStage,
     };
-  });
+  };
+
+  return callerTx ? run(callerTx) : prisma.$transaction(run);
 }
 
 /**
@@ -372,6 +384,33 @@ async function advanceWorkflowOrComplete(params: {
   };
 }
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Acquires an exclusive database row lock on an ApprovalWorkflowInstance using PostgreSQL SELECT ... FOR UPDATE.
+ * Serializes workflow decisions, skips, resubmissions, and cancellations within the active transaction.
+ */
+async function lockWorkflowInstance(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  instanceId: string,
+) {
+  if (!UUID_REGEX.test(instanceId) || !UUID_REGEX.test(organizationId)) {
+    throw new WorkflowNotFoundError("Workflow instance not found.");
+  }
+
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM approval_workflow_instances
+    WHERE id = ${instanceId}::uuid AND organization_id = ${organizationId}::uuid
+    FOR UPDATE
+  `;
+
+  if (!rows || rows.length === 0) {
+    throw new WorkflowNotFoundError("Workflow instance not found.");
+  }
+}
+
 /**
  * Records an approval decision for an active stage instance.
  *
@@ -394,6 +433,7 @@ export async function recordApprovalDecision(input: RecordDecisionInput) {
     approverId,
     decisionType,
     comment,
+    tx: callerTx,
   } = input;
 
   if (decisionType === "REJECT" || decisionType === "REQUEST_CHANGES") {
@@ -404,7 +444,10 @@ export async function recordApprovalDecision(input: RecordDecisionInput) {
     }
   }
 
-  return prisma.$transaction(async (tx) => {
+  const run = async (tx: Prisma.TransactionClient) => {
+    // 0. Acquire exclusive row lock on the workflow instance to serialize decisions
+    await lockWorkflowInstance(tx, organizationId, instanceId);
+
     // 1. Load instance and active stage instance with row lock consideration
     const instance = await tx.approvalWorkflowInstance.findFirst({
       where: { id: instanceId, organizationId },
@@ -752,7 +795,9 @@ export async function recordApprovalDecision(input: RecordDecisionInput) {
     }
 
     throw new WorkflowValidationError(`Unsupported decision type "${decisionType}".`);
-  });
+  };
+
+  return callerTx ? run(callerTx) : prisma.$transaction(run);
 }
 
 /**
@@ -762,7 +807,7 @@ export async function recordApprovalDecision(input: RecordDecisionInput) {
  * - Mandatory stages cannot be skipped.
  */
 export async function skipOptionalStage(input: SkipOptionalStageInput) {
-  const { organizationId, instanceId, actorId, reason } = input;
+  const { organizationId, instanceId, actorId, reason, tx: callerTx } = input;
 
   if (!reason || reason.trim().length < 3) {
     throw new WorkflowValidationError(
@@ -770,7 +815,7 @@ export async function skipOptionalStage(input: SkipOptionalStageInput) {
     );
   }
 
-  return prisma.$transaction(async (tx) => {
+  const run = async (tx: Prisma.TransactionClient) => {
     // 1. Verify actor exists and is active
     const actor = await tx.user.findFirst({
       where: { id: actorId, organizationId, deletedAt: null },
@@ -779,7 +824,10 @@ export async function skipOptionalStage(input: SkipOptionalStageInput) {
       throw new WorkflowValidationError("Actor not found or not active in the organization.");
     }
 
-    // 2. Load instance and active stage
+    // 2. Acquire exclusive row lock on the workflow instance
+    await lockWorkflowInstance(tx, organizationId, instanceId);
+
+    // 3. Load instance and active stage
     const instance = await tx.approvalWorkflowInstance.findFirst({
       where: { id: instanceId, organizationId },
       include: {
@@ -816,9 +864,25 @@ export async function skipOptionalStage(input: SkipOptionalStageInput) {
       );
     }
 
+    // 4. Verify approver eligibility for this stage
+    const eligibility = await evaluateApproverEligibility({
+      organizationId,
+      stageId: stage.id,
+      userId: actorId,
+      requesterId: instance.requesterId,
+      departmentId: instance.departmentId,
+      tx,
+    });
+
+    if (!eligibility.eligible) {
+      throw new ApproverEligibilityError(
+        eligibility.reason ?? "User is not authorized to skip this stage.",
+      );
+    }
+
     const now = new Date();
 
-    // 4. Mark stage instance as SKIPPED
+    // 5. Mark stage instance as SKIPPED
     await tx.approvalStageInstance.update({
       where: { id: activeStageInstance.id },
       data: {
@@ -828,7 +892,7 @@ export async function skipOptionalStage(input: SkipOptionalStageInput) {
       },
     });
 
-    // 5. Record skip decision and audit events
+    // 6. Record skip decision and audit events
     const decision = await tx.approvalDecision.create({
       data: {
         organizationId,
@@ -858,7 +922,7 @@ export async function skipOptionalStage(input: SkipOptionalStageInput) {
       },
     });
 
-    // 6. Advance to next stage or complete workflow
+    // 7. Advance to next stage or complete workflow
     const advanceResult = await advanceWorkflowOrComplete({
       tx,
       organizationId,
@@ -873,7 +937,9 @@ export async function skipOptionalStage(input: SkipOptionalStageInput) {
       instance: advanceResult.instance,
       nextStageInstance: advanceResult.nextStageInstance,
     };
-  });
+  };
+
+  return callerTx ? run(callerTx) : prisma.$transaction(run);
 }
 
 /**
@@ -883,9 +949,13 @@ export async function skipOptionalStage(input: SkipOptionalStageInput) {
  * - Records audit event.
  */
 export async function resubmitWorkflowInstance(input: ResubmitWorkflowInput) {
-  const { organizationId, instanceId, requesterId, comment } = input;
+  const { organizationId, instanceId, requesterId, comment, tx: callerTx } = input;
 
-  return prisma.$transaction(async (tx) => {
+  const run = async (tx: Prisma.TransactionClient) => {
+    // 1. Acquire exclusive row lock on the workflow instance
+    await lockWorkflowInstance(tx, organizationId, instanceId);
+
+    // 2. Load instance and last stage instance
     const instance = await tx.approvalWorkflowInstance.findFirst({
       where: { id: instanceId, organizationId },
       include: {
@@ -975,14 +1045,16 @@ export async function resubmitWorkflowInstance(input: ResubmitWorkflowInput) {
       instance: updatedInstance,
       stageInstance: newStageInstance,
     };
-  });
+  };
+
+  return callerTx ? run(callerTx) : prisma.$transaction(run);
 }
 
 /**
  * Cancels an in-flight workflow instance when permitted.
  */
 export async function cancelWorkflowInstance(input: CancelWorkflowInput) {
-  const { organizationId, instanceId, actorId, reason } = input;
+  const { organizationId, instanceId, actorId, reason, tx: callerTx } = input;
 
   if (!reason || reason.trim().length < 3) {
     throw new WorkflowValidationError(
@@ -990,7 +1062,7 @@ export async function cancelWorkflowInstance(input: CancelWorkflowInput) {
     );
   }
 
-  return prisma.$transaction(async (tx) => {
+  const run = async (tx: Prisma.TransactionClient) => {
     // 1. Verify actor
     const actor = await tx.user.findFirst({
       where: { id: actorId, organizationId, deletedAt: null },
@@ -999,7 +1071,10 @@ export async function cancelWorkflowInstance(input: CancelWorkflowInput) {
       throw new WorkflowValidationError("Actor not found or not active in the organization.");
     }
 
-    // 2. Load instance
+    // 2. Acquire exclusive row lock on the workflow instance
+    await lockWorkflowInstance(tx, organizationId, instanceId);
+
+    // 3. Load instance
     const instance = await tx.approvalWorkflowInstance.findFirst({
       where: { id: instanceId, organizationId },
       include: {
@@ -1030,7 +1105,7 @@ export async function cancelWorkflowInstance(input: CancelWorkflowInput) {
       await tx.approvalStageInstance.update({
         where: { id: activeStage.id },
         data: {
-          status: "REJECTED", // or terminal
+          status: "CANCELLED",
           completedAt: now,
           decisionSummary: `Workflow cancelled: ${reason.trim()}`,
         },
@@ -1064,7 +1139,9 @@ export async function cancelWorkflowInstance(input: CancelWorkflowInput) {
     });
 
     return updatedInstance;
-  });
+  };
+
+  return callerTx ? run(callerTx) : prisma.$transaction(run);
 }
 
 /**
